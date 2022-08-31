@@ -8,37 +8,49 @@ using InteractiveUtils
 begin
 	import Pkg
 	Pkg.activate(Base.current_project())
-end
 
-# ╔═╡ 19d0aca8-2714-11ed-1d26-df310749e64a
-begin
+	using ArchGDAL
 	using CSV
 	using DataFrames
-	using GeoDataFrames
-	const GDF=GeoDataFrames
-	using JSON
-	using GDAL
-	using Plots
-	using Gadfly
-	using ArchGDAL
 	using Dates
-	using Rasters
-	using Shapefile
-	using GeoInterface
-	import GeoFormatTypes as GFT
-end
+	using GeoDataFrames
+	using JSON
+	using Logging
+	using Plots
+	using YAML
+end;
 
-# ╔═╡ edcd55cb-885a-4d86-9601-b114d34472a7
-data_base = "/Users/thomas/Desktop/Work/Research/uil/postquals/ml_thermal/data/raw-data"
+# ╔═╡ 4ce9f094-273d-4497-9255-202726b00c11
+md"""
+## Chapter 1: New York City
+"""
 
 # ╔═╡ f6ba219d-9c7c-4947-a3fd-5a32e26e89a8
 begin
-	boundaries_path = joinpath(
-		data_base, 
-		"council_district.geojson"
+	sources_file = joinpath(pwd(), "sources.yml")
+	sources = YAML.load_file(sources_file)
+	nyc_sources = sources["data-sources"]["nyc"]
+	data_path = joinpath(pwd(), "data", "nyc")
+	
+	nyc_boundaries_path = joinpath(
+		data_path, 
+		"council-boundaries.geojson"
 	)
-	boundaries = GeoDataFrames.read(boundaries_path)
+	nyc_boundaries = GeoDataFrames.read(nyc_boundaries_path)
+	Plots.plot(
+		nyc_boundaries.geometry,
+		color=:transparent,
+		dpi=400
+	)
 end
+
+# ╔═╡ f65a1dea-039e-4705-ae78-10a385f85b6b
+md"""
+The data we have for new york city:
+"""
+
+# ╔═╡ efdf735f-9576-4117-8003-bd78037bd4f9
+nyc_sources
 
 # ╔═╡ 8db8b2ca-ee25-44a8-91d2-26b7c7fb8c0d
 md"""
@@ -56,8 +68,8 @@ md"""(1) *linking data*"""
 begin
 	linking_data = CSV.read(
 		joinpath(
-			data_base,
-			"Energy_and_Water_Data_Disclosure_for_Local_Law_84_2021__Data_for_Calendar_Year_2020_.csv"
+			data_path,
+			"annual-energy.csv"
 		),
 		DataFrame
 	)
@@ -72,22 +84,22 @@ md"""(2) *Full monthly energy data between 2018 and 2020*"""
 begin
 	nyc_monthly_2020 = CSV.read(
 		joinpath(
-			data_base,
-			"Local_Law_84_2021__Monthly_Data_for_Calendar_Year_2020_.csv"
+			data_path,
+			"monthly-energy-2020.csv"
 		),
 		DataFrame
 	)
 	nyc_monthly_2019 = CSV.read(
 		joinpath(
-			data_base,
-			"Local_Law_84_2020__Monthly_Data_for_Calendar_Year_2019_.csv"
+			data_path,
+			"monthly-energy-2019.csv"
 		),
 		DataFrame
 	)
 	nyc_monthly_2018 = CSV.read(
 		joinpath(
-			data_base,
-			"Local_Law_84_2019__Monthly_Data_for_Calendar_Year_2018_.csv"
+			data_path,
+			"monthly-energy-2018.csv"
 		),
 		DataFrame
 	)
@@ -99,9 +111,6 @@ begin
 	nyc_monthly[!,"date"] = DateTime.(nyc_monthly.Month, "u-y") .+ Dates.Year(2000)
 	select!(nyc_monthly, Not("Month"))
 end
-
-# ╔═╡ c5732743-88bd-48e9-bc1e-6e4ec665d9ca
-# parse.(Float64, nyc_monthly)
 
 # ╔═╡ 5c1383bb-50ad-43d9-ac99-2e2b14d41f33
 md"""(2) *unique monthly property ids - essentially only use the unique property ids seen*"""
@@ -116,8 +125,8 @@ md"""(3) *NYC building centroids*"""
 begin
 	nyc_building_points = GeoDataFrames.read(
 		joinpath(
-			data_base,
-			"building_p.geojson"
+			data_path,
+			"building-points.geojson"
 		)
 	)
 	rename!(
@@ -166,6 +175,8 @@ begin
 	)
 	dropmissing!(nyc_building_points_data)
 	unique!(nyc_building_points_data, ["Property Id"])
+
+	@info "building data and locations" select(nyc_building_points_data, Not(:geometry))
 end
 
 # ╔═╡ 68b4bfb9-a1ce-4a3c-8f18-a9933dd3239d
@@ -173,8 +184,8 @@ Plots.plot(
 	nyc_building_points_data.geometry, 
 	dpi=400,
 	color=:transparent,
-	opacity=0.1,
-	markersize=2
+	opacity=1,
+	markersize=0.5
 )
 
 # ╔═╡ f600bad4-f853-433c-ac06-90a2a797b6bb
@@ -192,23 +203,21 @@ md"""(1) *Testing with just a sample of building footprints for now, here is wha
 
 # ╔═╡ 8e462588-c0c1-4e96-a1fe-f2df50a8ec37
 begin
+	# want this file to change to the building shapefile before this is actually run
 	energy_model_footprints = GeoDataFrames.read(
 		joinpath(
-			data_base,
+			data_path,
 			"largest_buildings.geojson"
 		)
 	)
 	energy_model_footprints[!,"id"] = collect(1:nrow(energy_model_footprints))
+	sample_building = energy_model_footprints[5,"geometry"]
+
 	select!(energy_model_footprints, ["id","geometry"])
 end
 
 # ╔═╡ 14f9ac4d-e705-41fd-8561-4d1421e41126
-Plots.plot(energy_model_footprints[5,"geometry"], color=:transparent)
-
-# ╔═╡ 07980246-8d10-46b7-8e55-81f435b762b1
-begin
-	Plots.plot(nyc_building_points_data.geometry, markersize=0.1, dpi=400, color=:white)
-end
+Plots.plot(sample_building, color=:transparent)
 
 # ╔═╡ 2d956f5a-7f40-4a7d-b491-f3de3340cb66
 md"""
@@ -224,12 +233,12 @@ md"""
 # ╔═╡ 4e00b820-9f99-4134-afd7-2710424fe28e
 begin
 	Plots.plot(
-		ArchGDAL.boundingbox(energy_model_footprints.geometry[3]),
-		opacity=0.25,
+		ArchGDAL.boundingbox(sample_building),
+		opacity=0.15,
 		color=:gray
 	)
 	Plots.plot!(
-		energy_model_footprints.geometry[3],
+		sample_building,
 		color=:white
 	)
 end
@@ -305,9 +314,16 @@ end
 # ╔═╡ 9cfc27da-38b5-40cd-b41f-a1d2687011a8
 matched_points = nyc_building_points_data[matched_buildings.data_mapping, :]
 
+# ╔═╡ 69cd9bb6-01d7-447d-afbc-b349d01d9fbf
+begin
+	matched_points[:, "shapefile_id"] = matched_buildings.id
+	id_mapping = select(matched_points, ["Property Id","shapefile_id"])
+	@info "Matched building shapefiles with building IDs:" id_mapping
+end
+
 # ╔═╡ a85a3658-e1b5-4c57-a275-26a69dce572a
 begin
-	poi = 25
+	poi = 4
 	Plots.plot(matched_buildings.geometry[poi], color=:transparent)
 	Plots.plot!(matched_points.geometry[poi])
 end
@@ -326,9 +342,14 @@ matched_points[:, "Property Id"]
 # ╔═╡ 3bd5037f-87cf-4988-888f-d62c10de3195
 begin
 	# now going to output a list of all the idf files we want to run
-	simulation_output = joinpath("simulation_queue.txt")
+	@info "Creating queue of simulation files" id_mapping.shapefile_id
+	
+	output_dir = joinpath(data_path, "p1_o")
+	mkpath(output_dir)
+
+	simulation_output = joinpath(output_dir, "simulation_queue.txt")
 	open(simulation_output,"w") do io
-		for id in matched_buildings.id
+		for id in id_mapping.shapefile_id
 	   		println(io,string(id)*".idf")
 		end
 	end
@@ -336,28 +357,27 @@ end
 
 # ╔═╡ Cell order:
 # ╠═1ea68209-380d-4b2e-9239-bedf850b8243
-# ╠═19d0aca8-2714-11ed-1d26-df310749e64a
-# ╠═edcd55cb-885a-4d86-9601-b114d34472a7
+# ╟─4ce9f094-273d-4497-9255-202726b00c11
 # ╟─f6ba219d-9c7c-4947-a3fd-5a32e26e89a8
+# ╟─f65a1dea-039e-4705-ae78-10a385f85b6b
+# ╟─efdf735f-9576-4117-8003-bd78037bd4f9
 # ╟─8db8b2ca-ee25-44a8-91d2-26b7c7fb8c0d
 # ╟─f2013cd8-5ce1-47f0-8700-a0550612f943
 # ╟─e0eae347-e275-4737-b429-4dd2b04cb27c
 # ╟─4197d920-ef37-4284-970a-7fd4331ad9b7
-# ╟─6fc43b1e-bdd6-44dd-9940-9d96e25a285d
-# ╠═c5732743-88bd-48e9-bc1e-6e4ec665d9ca
+# ╠═6fc43b1e-bdd6-44dd-9940-9d96e25a285d
 # ╟─5c1383bb-50ad-43d9-ac99-2e2b14d41f33
 # ╠═10f410f6-992e-4063-ab0c-9f016f51eb5d
 # ╟─9a579e9d-8de1-4b82-9508-a378f08e2955
 # ╠═595ce11b-7fac-4ccc-a7e3-9ef5d114ac0d
 # ╟─e54c18df-46fe-4425-bdfc-ca8c529d436a
 # ╠═009bc1d3-6909-4edf-a615-2b1c7bdb1ce8
-# ╠═68b4bfb9-a1ce-4a3c-8f18-a9933dd3239d
+# ╟─68b4bfb9-a1ce-4a3c-8f18-a9933dd3239d
 # ╟─f600bad4-f853-433c-ac06-90a2a797b6bb
 # ╟─c97e405d-8601-4634-9a7c-654598dd1200
 # ╟─ab355e93-a064-40e2-a67a-e75cb54efb33
 # ╠═8e462588-c0c1-4e96-a1fe-f2df50a8ec37
 # ╟─14f9ac4d-e705-41fd-8561-4d1421e41126
-# ╠═07980246-8d10-46b7-8e55-81f435b762b1
 # ╟─2d956f5a-7f40-4a7d-b491-f3de3340cb66
 # ╟─630cbcdf-31c6-4a96-9c36-8fea5d64e2b9
 # ╟─4e00b820-9f99-4134-afd7-2710424fe28e
@@ -370,7 +390,8 @@ end
 # ╠═0c000a60-6fe3-464a-a8b6-906e1e94f02d
 # ╠═329d43de-17b6-4d11-a0c8-4cd0a6980932
 # ╠═9cfc27da-38b5-40cd-b41f-a1d2687011a8
-# ╠═a85a3658-e1b5-4c57-a275-26a69dce572a
+# ╠═69cd9bb6-01d7-447d-afbc-b349d01d9fbf
+# ╟─a85a3658-e1b5-4c57-a275-26a69dce572a
 # ╟─2520a4ec-cebd-4f27-8e21-5a5f9b55c8a9
 # ╠═f6e0da2e-1394-4945-aee7-67de4ade486c
 # ╠═39fc72af-2262-4597-9c44-c9ccd56b6ec9

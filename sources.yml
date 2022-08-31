@@ -21,8 +21,8 @@ data-sources:
       filetype: "csv"
       filesize: 40
     monthly-energy-2019: 
-      description: "https://data.cityofnewyork.us/Environment/Energy-and-Water-Data-Disclosure-for-Local-Law-84-/wcm8-aq5w/data"
-      download: "https://data.cityofnewyork.us/api/views/wcm8-aq5w/rows.csv?accessType=DOWNLOAD"
+      description: "https://data.cityofnewyork.us/Environment/Local-Law-84-2020-Monthly-Data-for-Calendar-Year-2/evu4-6zyr"
+      download: "https://data.cityofnewyork.us/api/views/evu4-6zyr/rows.csv?accessType=DOWNLOAD"
       filetype: "csv"
       filesize: 41
     monthly-energy-2018: 
