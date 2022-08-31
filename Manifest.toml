@@ -1170,6 +1170,12 @@ git-tree-sha1 = "5783b877201a82fc0014cbf381e7e6eb130473a4"
 uuid = "4c63d2b9-4356-54db-8cca-17b64c39e42c"
 version = "1.0.1"
 
+[[deps.StringEncodings]]
+deps = ["Libiconv_jll"]
+git-tree-sha1 = "50ccd5ddb00d19392577902f0079267a72c5ab04"
+uuid = "69024149-9ee7-55f6-a4c4-859efe599b68"
+version = "0.3.5"
+
 [[deps.StructArrays]]
 deps = ["Adapt", "DataAPI", "StaticArraysCore", "Tables"]
 git-tree-sha1 = "8c6ac65ec9ab781af05b08ff305ddc727c25f680"
@@ -1405,6 +1411,12 @@ deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "79c31e7844f6ecf779705fbc12146eb190b7d845"
 uuid = "c5fb5394-a638-5e4d-96e5-b29de1b5cf10"
 version = "1.4.0+3"
+
+[[deps.YAML]]
+deps = ["Base64", "Dates", "Printf", "StringEncodings"]
+git-tree-sha1 = "3c6e8b9f5cdaaa21340f841653942e1a6b6561e5"
+uuid = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
+version = "0.4.7"
 
 [[deps.ZipFile]]
 deps = ["Libdl", "Printf", "Zlib_jll"]
