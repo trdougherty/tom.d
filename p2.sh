@@ -4,6 +4,7 @@ SIMULATION_QUEUE_PATH=$PWD"/data/nyc/p1_o/sample_queue.txt"
 SIMULATION_FILES_PATH=$PWD"/data/simulation_files/idf/CO_San_Juan/"
 SIMULATION_OUTPU_PATH=$PWD"/data/simulation_files/output/"
 WEATHER_FILE=$PWD"/data/simulation_files/centralpark.epw"
+AVAILABLE_CORES=$(nproc --all)
 
 mkdir -p $SIMULATION_OUTPU_PATH
 
@@ -12,6 +13,7 @@ while read line; do
     filename="${line%.*}"
     simulation_output=$SIMULATION_OUTPU_PATH$filename
     mkdir -p $simulation_output
-    # energyplus -w $WEATHER_FILE -d $simulation_output $simulation_input
-    # energyplus --help
+    echo "Running simulation: "$filename
+    energyplus -w $WEATHER_FILE -d $simulation_output $simulation_input &> /dev/null &
 done < $SIMULATION_QUEUE_PATH
+wait
