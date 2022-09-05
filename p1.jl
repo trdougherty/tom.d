@@ -279,24 +279,20 @@ end
 
 # ╔═╡ 68c9d819-d948-4bcf-a625-64f2bdc26b62
 begin
-	regionlist::Vector{Union{Int64, Missing}} = 
-		fill(missing, length(nyc_building_points_data.geometry))
-
-	for (building_index, building_point) in enumerate(nyc_building_points_data.geometry)
-		for (boundary_index, boundary_geom) in enumerate(nyc_boundaries.geometry)
-			if GeoDataFrames.contains(boundary_geom, building_point)
-				regionlist[building_index] = nyc_boundaries[boundary_index, "coun_dist"]
-				break
+	let 
+		regionlist::Vector{Union{Int64, Missing}} = fill(missing, length(nyc_building_points_data.geometry))
+		for (building_index, building_point) in enumerate(nyc_building_points_data.geometry)
+			for (boundary_index, boundary_geom) in enumerate(nyc_boundaries.geometry)
+				if GeoDataFrames.contains(boundary_geom, building_point)
+					regionlist[building_index] = nyc_boundaries[boundary_index, "coun_dist"]
+					break
+				end
 			end
 		end
+		nyc_building_points_data[!, "council_region"] = regionlist;
+		dropmissing!(nyc_building_points_data);
 	end
 end
-
-# ╔═╡ 79feaefc-42b3-49bc-b4eb-092e2b6525f4
-begin
-	nyc_building_points_data[!, "council_region"] = regionlist;
-	dropmissing!(nyc_building_points_data);
-end;
 
 # ╔═╡ 2dea8532-505a-4b0e-8b98-966a47808804
 begin
@@ -663,7 +659,6 @@ At this point we should just be able to extract a list of building ids for which
 # ╟─e54c18df-46fe-4425-bdfc-ca8c529d436a
 # ╟─009bc1d3-6909-4edf-a615-2b1c7bdb1ce8
 # ╠═68c9d819-d948-4bcf-a625-64f2bdc26b62
-# ╠═79feaefc-42b3-49bc-b4eb-092e2b6525f4
 # ╠═2dea8532-505a-4b0e-8b98-966a47808804
 # ╠═07aab43a-697f-4d6a-a8c4-4415116368a7
 # ╟─878e4be3-1a1a-4f73-8823-fb69fd756437
