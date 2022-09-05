@@ -7,9 +7,9 @@ data-sources:
       filesize: 3.1
     council-boundaries: 
       description: "https://data.cityofnewyork.us/City-Government/City-Council-Districts-water-areas-included-/jgqm-ccbd"
-      download: "https://data.cityofnewyork.us/api/geospatial/jgqm-ccbd?method=export&format=GeoJSON"
+      download: "https://data.cityofnewyork.us/api/geospatial/yusd-j4xi?method=export&format=GeoJSON"
       filetype: "geojson"
-      filesize: 0.83
+      filesize: 3.7
     annual-energy: 
       description: "https://data.cityofnewyork.us/Environment/Energy-and-Water-Data-Disclosure-for-Local-Law-84-/usc3-8zwd"
       download: "https://data.cityofnewyork.us/api/views/usc3-8zwd/rows.csv?accessType=DOWNLOAD"
@@ -30,8 +30,8 @@ data-sources:
       download: "https://data.cityofnewyork.us/api/views/njuk-taxk/rows.csv?accessType=DOWNLOAD"
       filetype: "csv"
       filesize: 39
-    building-points: 
-      description: "https://data.cityofnewyork.us/Housing-Development/Building-Footprints/nqwf-w8eh"
-      download: "https://data.cityofnewyork.us/api/geospatial/7w4b-tj9d?method=export&format=GeoJSON"
+    building-footprints:
+      description: "https://github.com/CityOfNewYork/nyc-geo-metadata/blob/master/Metadata/Metadata_BuildingFootprints.md"
+      download: "https://data.cityofnewyork.us/api/geospatial/nqwf-w8eh?method=export&format=GeoJSON"
       filetype: "geojson"
-      filesize: 397
+      filesize: 826.7
