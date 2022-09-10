@@ -14,54 +14,21 @@ begin
 	using Colors, ColorSchemes
 	using DataFrames
 	using Dates
+	using Delaunay
 	using GeoDataFrames
+	using GeoFormatTypes
 	using JSON
 	using Logging
 	using Plots
 	using YAML
 	using StatsBase
+	using VoronoiDelaunay
 end;
 
-# ╔═╡ 4ce9f094-273d-4497-9255-202726b00c11
-md"""
-## Chapter 1: New York City
-"""
+# ╔═╡ f758a6da-9531-4d37-b22b-6902d2466b9b
+using Distances
 
-# ╔═╡ f6ba219d-9c7c-4947-a3fd-5a32e26e89a8
-begin
-	sources_file = joinpath(pwd(), "sources.yml")
-	sources = YAML.load_file(sources_file)
-	nyc_sources = sources["data-sources"]["nyc"]
-	data_path = joinpath(pwd(), "data", "nyc")
-	
-	nyc_boundaries_path = joinpath(
-		data_path, 
-		"council-boundaries.geojson"
-	)
-	nyc_boundaries = GeoDataFrames.read(nyc_boundaries_path)
-	nyc_boundaries[!,"coun_dist"] = parse.(Int64, nyc_boundaries[:,"coun_dist"])
-	Plots.plot(
-		nyc_boundaries.geometry,
-		color=:transparent,
-		dpi=400
-	)
-end
-
-# ╔═╡ b8717e75-42d2-4120-b5ca-92269babaa8e
-begin
-	output_dir = joinpath(data_path, "p1_o")
-	mkpath(output_dir)
-end
-
-# ╔═╡ d1ea0a90-7830-4d3f-8fb1-18cf88f3293c
-nyc_boundaries
-
-# ╔═╡ 0dc202b2-2130-482c-b8d4-c3e07e0a5ed9
-md"""
-##### Prepping functions for transforming the geometries between ESPG
-"""
-
-# ╔═╡ 91e95352-b96e-4246-9f44-fc9dec9755ed
+# ╔═╡ d71511d7-a2af-4639-8807-b33bd8e71cb4
 begin
 	function reproject_points!(
 		geom_obj::ArchGDAL.IGeometry,
@@ -91,12 +58,55 @@ begin
 	end
 end
 
-# ╔═╡ e6327ef0-c904-49c4-b43d-607ae3f199b4
+# ╔═╡ cb001a39-8daa-426d-9fb7-a64233f6b45c
+
+
+# ╔═╡ 7f162842-c24a-4fdf-866d-eb4df50e8d23
 begin
-	source = ArchGDAL.importEPSG(4326)
-	target = ArchGDAL.importEPSG(32618)
-	pm = ArchGDAL.importEPSG(3857)
+	# this pass going to try and keep everything in one coordinate system
+	source_num = 4326
+	target_num = 32618
+	pm_num = 3857
+	source = ArchGDAL.importPROJ4("+proj=longlat +datum=WGS84 +no_defs +type=crs")
+	target = ArchGDAL.importEPSG(target_num)
+	pm = ArchGDAL.importEPSG(pm_num)
 end;
+
+# ╔═╡ 4ce9f094-273d-4497-9255-202726b00c11
+md"""
+## Chapter 1: New York City
+"""
+
+# ╔═╡ f6ba219d-9c7c-4947-a3fd-5a32e26e89a8
+begin
+	sources_file = joinpath(pwd(), "sources.yml")
+	sources = YAML.load_file(sources_file)
+	nyc_sources = sources["data-sources"]["nyc"]
+	data_path = joinpath(pwd(), "data", "nyc")
+	
+	nyc_boundaries_path = joinpath(
+		data_path, 
+		"council-boundaries.geojson"
+	)
+	nyc_boundaries = GeoDataFrames.read(nyc_boundaries_path)
+	reproject_points!(nyc_boundaries.geometry, source, target)
+
+	nyc_boundaries[!,"coun_dist"] = parse.(Int64, nyc_boundaries[:,"coun_dist"])
+	Plots.plot(
+		nyc_boundaries.geometry,
+		color=:transparent,
+		dpi=400
+	)
+end
+
+# ╔═╡ b8717e75-42d2-4120-b5ca-92269babaa8e
+begin
+	output_dir = joinpath(data_path, "p1_o")
+	mkpath(output_dir)
+end
+
+# ╔═╡ d1ea0a90-7830-4d3f-8fb1-18cf88f3293c
+nyc_boundaries
 
 # ╔═╡ f65a1dea-039e-4705-ae78-10a385f85b6b
 md"""
@@ -181,6 +191,8 @@ begin
 			"Natural Gas Use  (kBtu)" => "naturalgas_kbtu"
 		]
 	)
+	nyc_monthly[:,"electricity_mwh"] = nyc_monthly.electricity_kbtu ./ 3.412e+6
+	nyc_monthly[:,"naturalgas_mwh"] = nyc_monthly.naturalgas_kbtu ./ 3.412e+6
 end
 
 # ╔═╡ ccf8cb9f-88a4-4f41-a635-d02dc479e50d
@@ -235,7 +247,7 @@ begin
 	# want to reproject the coordinates into something which preserves meters
 	reproject_points!(footprints.geometry, source, target)
 	footprints[!,"area"] = ArchGDAL.geomarea.(footprints.geometry)
-	reproject_points!(footprints.geometry, target, source)
+	# reproject_points!(footprints.geometry, target, source)
 
 	# finally drop all the buildings without a geometry provided
 	filter!(row -> row.area > 0, footprints)
@@ -276,6 +288,14 @@ begin
 
 	# @info "building data and locations" select(nyc_building_points_data, Not(:geometry))
 end
+
+# ╔═╡ a7e02d02-158f-44d5-8d2e-28d5aba1cca5
+
+
+# ╔═╡ 61c4ad16-99ef-4d21-a4dd-cae897e18659
+md"""
+##### Cleaned list of buildings in each of the council regions
+"""
 
 # ╔═╡ 68c9d819-d948-4bcf-a625-64f2bdc26b62
 begin
@@ -407,68 +427,6 @@ end
 # ╔═╡ f69cb982-573f-43c4-8fb0-a1aab6028021
 nyc_building_points_data
 
-# ╔═╡ 54ebbdff-f0ae-4265-bacf-a0301d5701b0
-GeoDataFrames.write(joinpath(output_dir, "nyc_data.geojson"), nyc_building_points_data)
-
-# ╔═╡ 2d234542-d4bf-41aa-8ed9-9d91b9b69284
-begin
-	nyc_data_stripped = select(nyc_building_points_data, Not(:geometry))
-	nyc_train_buildings = filter(row -> row.council_region ∉ candidate_councils, nyc_data_stripped)
-
-	nyc_validation_buildings = filter(row -> row.council_region ∈ validation_districts, nyc_data_stripped)
-
-	nyc_test_buildings = filter(row -> row.council_region ∈ test_districts, nyc_data_stripped)
-end;
-
-# ╔═╡ ee175b30-0f05-4e91-9a0a-d9ef9f7d5a32
-begin
-	CSV.write(joinpath(output_dir, "train_buildings.csv"), nyc_train_buildings);
-	CSV.write(joinpath(output_dir, "validate_buildings.csv"), nyc_validation_buildings);
-	CSV.write(joinpath(output_dir, "test_buildings.csv"), nyc_test_buildings);
-end;
-
-# ╔═╡ 13e53eaf-a09e-45bd-ba81-8bbbd4f48b20
-begin
-	nyc_train = select(
-		leftjoin(nyc_train_buildings, nyc_monthly, on="Property Id"),
-		"Property Id", "date", :)
-	dropmissing!(nyc_train, :date)
-	
-	nyc_validate = select(
-		leftjoin(nyc_validation_buildings, nyc_monthly, on="Property Id"),
-		"Property Id", "date", :)
-	dropmissing!(nyc_validate, :date)
-	
-	nyc_test = select(
-		leftjoin(nyc_test_buildings, nyc_monthly, on="Property Id"),
-		"Property Id", "date", :)
-	dropmissing!(nyc_test, :date)
-end;
-
-# ╔═╡ 309d3bcc-359d-4cf3-b2f1-28744f4d5cb0
-# training percentage
-nrow(dropmissing(nyc_train)) / nrow(nyc_train)
-
-# ╔═╡ ea2eacce-d6a8-4f00-a04c-101d6918a471
-# validation percentage
-nrow(dropmissing(nyc_validate)) / nrow(nyc_validate)
-
-# ╔═╡ 7f14239b-4fb4-4dd7-ab4d-be73bae4ed93
-# validation percentage
-nrow(dropmissing(nyc_test)) / nrow(nyc_test)
-
-# ╔═╡ 36e0c27b-d77e-4616-a5f9-b11cc56c7f3f
-md"""
-##### Want to strip the geometries from the objects here and just store it as a csv to improve operation with other data types
-"""
-
-# ╔═╡ 6800885e-c030-46fd-9220-f75ea87dadb0
-begin
-	CSV.write(joinpath(output_dir, "train.csv"), nyc_train);
-	CSV.write(joinpath(output_dir, "validate.csv"), nyc_validate);
-	CSV.write(joinpath(output_dir, "test.csv"), nyc_test);
-end;
-
 # ╔═╡ c97e405d-8601-4634-9a7c-654598dd1200
 md"""
 #### Stage 2
@@ -566,9 +524,6 @@ md"""
 Estimated time with candidate process:
 """
 
-# ╔═╡ c5398a9d-e4fd-4703-9676-2e07334caeaf
-0.963 * (1.1e6 / 50) / (60 * 60)
-
 # ╔═╡ 5a35d191-76e7-447e-841d-881b47ab8d6c
 md"""
 After mapping to the data points we have for the buildings
@@ -630,22 +585,440 @@ At this point we should just be able to extract a list of building ids for which
 # 	end
 # end
 
+# ╔═╡ b4d4e254-5198-4b0f-b9e8-054fe97f7f3a
+md"""
+#### Stage 3
+Extracting what we know about the epw weather files
+"""
+
+# ╔═╡ a88489a2-2da2-492e-94d6-7af90feaf92f
+typeof(output_dir)
+
+# ╔═╡ 6cabf58a-7082-4a18-9dd3-b9334f2ccd9f
+epw_dir::String = joinpath(data_path, "tmy-files")
+
+# ╔═╡ edd15ef6-80ca-496d-9073-49a430b9d2ed
+# first, we need a way of extracting the geographic information from the weather stations
+function epw_location(epw_dir::String)
+	readdir(epw_dir)
+end
+
+# ╔═╡ 621d236a-ce0a-4bf5-9486-d481527d3261
+epw_files = filter( x -> endswith(x, ".epw"), epw_location(epw_dir) )
+
+# ╔═╡ abec0385-4725-4a51-8ef4-bda7cfaede64
+epw_full_files = joinpath.(epw_dir, epw_files)
+
+# ╔═╡ ca10ae5a-7a94-42eb-97e0-770e7f781a4c
+epw_datafile_path = joinpath(output_dir, "epw-geodf.csv")
+
+# ╔═╡ 28a46b6f-ae61-4639-8448-699451ea228c
+begin
+	# want to make sure we wipe the file before we start
+	close(open(epw_datafile_path, "w"))
+	
+	epw_io = open(epw_datafile_path, "w")
+	for epw_file in epw_full_files
+		println(epw_io, readline(epw_file))
+	end
+	close(epw_io)
+end
+
+# ╔═╡ c92d5491-a044-4943-835c-cc2ecc418208
+epw_geo_headers = [
+	"Source",
+	"City",
+	"State",
+	"Country",
+	"Type",
+	"Location ID",
+	"Longitude",
+	"Latitude",
+	"Time Zone",
+	"Elevation"
+];
+
+# ╔═╡ 052750a1-4941-47b8-9b54-518a4bc6cb67
+begin
+	epw_geo = CSV.read(epw_datafile_path, header=epw_geo_headers, DataFrame)
+	epw_geo[!,"filename"] = epw_files
+	epw_geo[!,"geometry"] = createpoint.(zip(epw_geo.Latitude, epw_geo.Longitude))
+	filter!( row -> row.Type == "TMY3", epw_geo )
+	reproject_points!(epw_geo.geometry, source, target)
+end;
+
+# ╔═╡ 14b73aa8-cdc6-40c9-ac38-39039f19dae7
+md"""
+Here are the weather stations, projected into the New York UTM zone (which dones't make sense for most of the US...)
+"""
+
+# ╔═╡ a1cd7408-c92b-432c-8830-a7d709d7c298
+Plots.plot(
+	epw_geo.geometry,
+	color="white",
+	markersize=1.5
+)
+
+# ╔═╡ 3e5adcf1-0815-41b6-bd06-113cbd35072c
+md"""
+##### now extracting a region around the city. 
+The city is 783.8km², so let's get all weather stations within 25km² to be safe. Going to find the mean point of the buildings and run a circle of 25km radius around
+"""
+
+# ╔═╡ 7e1470f0-d52d-48cb-a62a-07acb02e18a5
+nyc_building_centroids = ArchGDAL.centroid.(nyc_building_points_data.geometry);
+
+# ╔═╡ c6e1f5ac-55a0-4175-b05b-236a2eb68561
+# want this in KM
+projection_dist = 45e3
+
+# ╔═╡ 5c352c0c-0775-446d-b785-e7d9d2677c41
+# like to keep these together as reproject changes the original dataframe
+begin
+	nyc_building_lons = ArchGDAL.getx.(nyc_building_centroids, 0)
+	nyc_building_lats = ArchGDAL.gety.(nyc_building_centroids, 0)
+	building_locations = hcat(
+		nyc_building_lons,
+		nyc_building_lats
+	)
+
+	mean_lat = mean(nyc_building_lats)
+	mean_lon = mean(nyc_building_lons)
+	
+	weather_region = ArchGDAL.buffer(
+		ArchGDAL.createpoint(mean_lon, mean_lat), 
+		projection_dist
+	)
+end;
+
+# ╔═╡ c7fcad00-fa50-4a3f-ab13-8ac392b7abe7
+md"""
+Finally we can filter for the stations which provide local weather data
+"""
+
+# ╔═╡ 643e0bbb-89e5-45a5-bcca-991cfc66e85d
+epw_local = filter( row -> ArchGDAL.contains(weather_region, row.geometry), epw_geo );
+
+# ╔═╡ 1b7432eb-bc8d-4bd1-a19c-06ca71c29786
+begin
+	Plots.plot(
+		weather_region, 
+		opacity=0.15, 
+		color="gray",
+		size=(650,550),
+		dpi=400
+	)
+	Plots.plot!(
+		nyc_building_centroids[1:1000],
+		markersize=0.5,
+		color="white"
+	)
+	Plots.plot!(
+		epw_local.geometry,
+		markerstrokewidth=0,
+		color="indianred"
+	)
+end
+
+# ╔═╡ e6c80d02-1841-4598-bb38-bdb7a06e11ab
+md"""
+### Distances
+at this point, now want to find the pairwise distances between each building and the weather stations. Then we want to choose the smallest distance and grab the index of the weather station
+"""
+
+# ╔═╡ a68eb98c-3991-452a-b4b8-9564a4890e6a
+begin
+	local_lon = ArchGDAL.getx.(epw_local.geometry, 0)
+	local_lat = ArchGDAL.gety.(epw_local.geometry, 0)
+	epw_points = hcat(local_lon, local_lat)
+end;
+
+# ╔═╡ e00c4191-6ab4-4144-a877-42834d4bb199
+md"""
+so we have a number of weather locations
+"""
+
+# ╔═╡ b68f0739-3b62-4586-b50f-4654deafce26
+size(epw_points)
+
+# ╔═╡ 9d7307e5-af20-44fd-bf34-793594f65bd6
+md"""
+and we have a big list of buildings
+"""
+
+# ╔═╡ 56d1d77d-d1ca-448a-b5b3-0ff83a1c1141
+size(building_locations)
+
+# ╔═╡ cabaa3df-3eeb-4982-bd4e-d5b26278302a
+building_weather_distances = pairwise(
+	Euclidean(),
+	epw_points, 
+	building_locations,
+	dims=1
+);
+
+# ╔═╡ d0678256-9f5d-4c1f-bcb3-33f50e9b9f7c
+building_weather_distances
+
+# ╔═╡ 95105b4c-64a5-481e-893b-e915bd46fc1f
+min_dist, min_index = findmin(building_weather_distances, dims=1)
+
+# ╔═╡ e0dda8c5-fffe-4469-9a60-9a5596e21e3a
+begin
+	Plots.plot(
+		nyc_council_counts.geometry,
+		color="transparent",
+		title="Weather Stations",
+		dpi=500
+	)
+	Plots.plot!(
+		epw_local[unique(map( x -> x[1], min_index )), :].geometry,
+		color="red"
+	)
+end
+
+# ╔═╡ a50cd1a7-4c17-4b71-91e8-82c3b8acac2f
+unique(map( x -> x[1], min_index ))
+
+# ╔═╡ 135cd14a-1e9f-4837-a159-a569ac676b0b
+min_distances = min_dist[1,:]
+
+# ╔═╡ c705fcf9-369c-44da-852b-4ec457f0d5b4
+maximum(min_distances)
+
+# ╔═╡ b993865b-cc70-46a0-a87c-8ec56fd58e2a
+minimum(min_distances)
+
+# ╔═╡ de137895-c4f4-4233-a4f2-935be5177d85
+Plots.histogram(min_distances / 1e3, color="transparent", bins=40, title="Distance to Nearest Weather Station (km)")
+
+# ╔═╡ 8bcfc861-0479-4763-a455-f09f4df09186
+min_station_idx = map( x -> x[1], min_index );
+
+# ╔═╡ 45abdf93-87e4-455d-8500-55adb51c9c0e
+min_station_ids = Matrix(select(epw_local, "Location ID"))[min_station_idx][1,:];
+
+# ╔═╡ f5db610a-7704-459b-9fb0-ec22c7dbdaee
+begin
+	nyc_building_points_data[!, "weather_station_id"] = min_station_ids;
+	nyc_building_points_data[!, "weather_station_distance"] = min_distances
+end;
+
+# ╔═╡ 9145880b-2b40-49d2-815c-bd8cf7e090c2
+countmap(nyc_building_points_data.weather_station_id)
+
+# ╔═╡ 9f1b44e9-5106-4747-bdbe-84dcda3d9717
+log.(nyc_building_points_data.weather_station_distance)
+
+# ╔═╡ 6085ae4a-6874-4b38-91b3-5b4b60f3806f
+distance_colors = cgrad(:matter)
+
+# ╔═╡ 64fefeee-7980-41c2-8a2f-2e539da260a4
+distance_colormap = distance_colors[standardize(
+	UnitRangeTransform, 
+	nyc_building_points_data.weather_station_distance
+)]
+
+# ╔═╡ 2626b03d-e2e8-405e-84a4-ccb5d8432e5c
+begin
+	unique_weatherstations = unique(nyc_building_points_data.weather_station_id)
+	unique_weathermap = Dict(zip(
+		unique_weatherstations,
+		collect(1:length(unique_weatherstations))
+	))
+end
+
+# ╔═╡ 2f0caff4-5cf0-4c15-a143-9e8ef52a63f0
+weather_colorscheme = cgrad(:matter, length(unique_weatherstations), categorical=true)
+
+# ╔═╡ c29ca84d-fa67-48c1-89c3-347b4ed2de24
+begin
+	weather_colors = weather_colorscheme[map( x -> unique_weathermap[x], nyc_building_points_data.weather_station_id )]
+end
+
+# ╔═╡ 0cb33287-09da-47ff-9839-ed7d6b4da7e7
+begin
+	random_buildings_idx = sample(1:length(nyc_building_centroids), 500)
+	random_buildings = nyc_building_centroids[random_buildings_idx]
+	random_colors = distance_colormap[random_buildings_idx]
+	random_weather_colors = weather_colors[random_buildings_idx]
+end;
+
+# ╔═╡ 805be959-76eb-4d96-aed4-b9344af198b0
+md"""
+##### This function is meant to show how the buildings are getting mapped to the closest weather station
+"""
+
+# ╔═╡ efbb87f4-9ecb-411e-a380-61897a89f178
+begin
+	Plots.plot(
+		random_buildings,
+		color_palette = random_weather_colors,
+		markersize=3,
+		markerstrokewidth=0,
+		dpi=500,
+		size=(700,500)
+	)
+	Plots.plot!(
+		nyc_council_counts.geometry,
+		color="transparent"
+	)
+	Plots.plot!(
+		epw_local.geometry,
+		color="white", 
+		markersize=8,
+		markerstrokewidth=2
+	)
+end
+
+# ╔═╡ bcf9c256-c6e7-45a2-b76d-12866bbb038b
+md"""
+##### Or we could instead visualize the distances between the buildings and their closest weather station
+"""
+
+# ╔═╡ 9f5a9366-f35a-4639-a141-4341f7ac41f9
+begin
+	Plots.plot(
+		random_buildings,
+		color_palette = random_colors,
+		markersize=3,
+		markerstrokewidth=0,
+		dpi=500,
+		size=(700,500)
+	)
+	Plots.plot!(
+		nyc_council_counts.geometry,
+		color="transparent"
+	)
+	Plots.plot!(
+		epw_local.geometry,
+		color="white", 
+		markersize=8,
+		markerstrokewidth=2
+	)
+end
+
+# ╔═╡ 8928439e-6d4b-4c65-8edb-0e329f86d4ec
+# now going to try and map the weather station indicator
+countmap(nyc_building_points_data.weather_station_id)
+
+# ╔═╡ 9981f7e4-8aa4-41b0-9827-1e7ed5b86920
+first(nyc_building_points_data, 3)
+
+# ╔═╡ e577c8ad-4968-4c97-ba65-aea8b888a493
+first(epw_local, 3)
+
+# ╔═╡ 5379b543-b900-4ffb-a7b9-24107d2c74ef
+# saving the local epw dataframe to build a data map later
+CSV.write(
+	joinpath(output_dir, "epw_local.csv"),
+	select(epw_local, Not([:geometry, :Source]))
+)
+
+# ╔═╡ 9eaefae4-4b09-4738-9e6e-cccd9eefc512
+begin
+	# this cell now transports the epws for use in the next stage
+	local_epws = joinpath(output_dir, "local-epws")
+	mkpath(local_epws)
+	
+	for epw in epw_local.filename
+		existing_epw = joinpath(epw_dir, epw)
+		cp(existing_epw, joinpath(local_epws, epw), force=true)
+	end
+end
+
+# ╔═╡ 656232a8-af8d-4086-b934-606005fd1359
+GeoDataFrames.write(
+	joinpath(output_dir, "buildings.geojson"),
+	nyc_building_points_data
+)
+
+# ╔═╡ 6bb085a2-ab02-4103-9a64-1ada10c8726b
+begin
+	nyc_buildings_simple = deepcopy(nyc_building_points_data)
+	nyc_buildings_simple[!,"geometry"] = ArchGDAL.boundingbox.(nyc_building_points_data.geometry)
+	
+	GeoDataFrames.write(
+		joinpath(output_dir, "buildings_bbox.geojson"), 
+		nyc_buildings_simple
+	)
+end
+
+# ╔═╡ d037b44c-7f84-4b22-8be1-cc644f11bd26
+begin
+	nyc_data_stripped = select(nyc_building_points_data, Not(:geometry))
+	nyc_train_buildings = filter(row -> row.council_region ∉ candidate_councils, nyc_data_stripped)
+
+	nyc_validation_buildings = filter(row -> row.council_region ∈ validation_districts, nyc_data_stripped)
+
+	nyc_test_buildings = filter(row -> row.council_region ∈ test_districts, nyc_data_stripped)
+end;
+
+# ╔═╡ 0b1b09b5-d55c-48c1-a876-0783766476cf
+begin
+	CSV.write(joinpath(output_dir, "train_buildings.csv"), nyc_train_buildings);
+	CSV.write(joinpath(output_dir, "validate_buildings.csv"), nyc_validation_buildings);
+	CSV.write(joinpath(output_dir, "test_buildings.csv"), nyc_test_buildings);
+end;
+
+# ╔═╡ 55921f40-4103-4606-98cf-287ca8fb9a19
+begin
+	nyc_train = select(
+		leftjoin(nyc_train_buildings, nyc_monthly, on="Property Id"),
+		"Property Id", "date", :)
+	dropmissing!(nyc_train, :date)
+	
+	nyc_validate = select(
+		leftjoin(nyc_validation_buildings, nyc_monthly, on="Property Id"),
+		"Property Id", "date", :)
+	dropmissing!(nyc_validate, :date)
+	
+	nyc_test = select(
+		leftjoin(nyc_test_buildings, nyc_monthly, on="Property Id"),
+		"Property Id", "date", :)
+	dropmissing!(nyc_test, :date)
+end;
+
+# ╔═╡ 022a9d72-68fb-4764-adbb-9cbe1a6ab44b
+# training percentage
+nrow(dropmissing(nyc_train)) / nrow(nyc_train)
+
+# ╔═╡ d60c9e77-2a3e-4975-a38c-2102af2b8706
+# validation percentage
+nrow(dropmissing(nyc_validate)) / nrow(nyc_validate)
+
+# ╔═╡ af43f162-0f5c-4c0e-ab8d-c6c2032af565
+# validation percentage
+nrow(dropmissing(nyc_test)) / nrow(nyc_test)
+
+# ╔═╡ 371ee554-2386-45b7-a09b-09b8772cb377
+md"""
+##### Want to strip the geometries from the objects here and just store it as a csv to improve operation with other data types
+"""
+
+# ╔═╡ ed6ed540-885a-41e1-9348-27826b74d194
+begin
+	CSV.write(joinpath(output_dir, "train.csv"), nyc_train);
+	CSV.write(joinpath(output_dir, "validate.csv"), nyc_validate);
+	CSV.write(joinpath(output_dir, "test.csv"), nyc_test);
+end;
+
 # ╔═╡ Cell order:
 # ╠═1ea68209-380d-4b2e-9239-bedf850b8243
 # ╠═b8717e75-42d2-4120-b5ca-92269babaa8e
+# ╠═d71511d7-a2af-4639-8807-b33bd8e71cb4
+# ╠═cb001a39-8daa-426d-9fb7-a64233f6b45c
+# ╠═7f162842-c24a-4fdf-866d-eb4df50e8d23
 # ╟─4ce9f094-273d-4497-9255-202726b00c11
-# ╟─f6ba219d-9c7c-4947-a3fd-5a32e26e89a8
+# ╠═f6ba219d-9c7c-4947-a3fd-5a32e26e89a8
 # ╠═d1ea0a90-7830-4d3f-8fb1-18cf88f3293c
-# ╟─0dc202b2-2130-482c-b8d4-c3e07e0a5ed9
-# ╟─91e95352-b96e-4246-9f44-fc9dec9755ed
-# ╠═e6327ef0-c904-49c4-b43d-607ae3f199b4
 # ╟─f65a1dea-039e-4705-ae78-10a385f85b6b
 # ╟─efdf735f-9576-4117-8003-bd78037bd4f9
 # ╟─8db8b2ca-ee25-44a8-91d2-26b7c7fb8c0d
 # ╟─f2013cd8-5ce1-47f0-8700-a0550612f943
 # ╟─e0eae347-e275-4737-b429-4dd2b04cb27c
 # ╟─4197d920-ef37-4284-970a-7fd4331ad9b7
-# ╟─6fc43b1e-bdd6-44dd-9940-9d96e25a285d
+# ╠═6fc43b1e-bdd6-44dd-9940-9d96e25a285d
 # ╠═ccf8cb9f-88a4-4f41-a635-d02dc479e50d
 # ╠═0f3a58c2-ae4b-4c89-9791-803cb89ab51e
 # ╠═78ace92e-81de-47e7-a19b-41a0c5f35bb4
@@ -658,6 +1031,8 @@ At this point we should just be able to extract a list of building ids for which
 # ╠═d48973e8-b6a7-407e-b007-a7219ecaff2a
 # ╟─e54c18df-46fe-4425-bdfc-ca8c529d436a
 # ╟─009bc1d3-6909-4edf-a615-2b1c7bdb1ce8
+# ╟─a7e02d02-158f-44d5-8d2e-28d5aba1cca5
+# ╟─61c4ad16-99ef-4d21-a4dd-cae897e18659
 # ╠═68c9d819-d948-4bcf-a625-64f2bdc26b62
 # ╠═2dea8532-505a-4b0e-8b98-966a47808804
 # ╠═07aab43a-697f-4d6a-a8c4-4415116368a7
@@ -667,7 +1042,7 @@ At this point we should just be able to extract a list of building ids for which
 # ╠═691a9409-ab03-4843-9743-5685c563af81
 # ╠═e7f3b286-fe7e-48ce-a01a-25e5e3743267
 # ╠═5f548a26-a95e-4bc7-9dad-7bdefa41611c
-# ╟─9c877f38-ecf8-4acd-9849-200fb01bce00
+# ╠═9c877f38-ecf8-4acd-9849-200fb01bce00
 # ╠═734c7a3b-10d5-4627-ae4d-1f787509e838
 # ╟─70a44334-ae15-4225-9f2e-668f6ee2b965
 # ╠═7e0ecfd3-cdea-4470-a799-acbebc67e7dd
@@ -676,15 +1051,6 @@ At this point we should just be able to extract a list of building ids for which
 # ╠═bab66f4b-1d1e-46ad-ae79-1c4f5fae6273
 # ╟─0bfc6dec-97dd-4a7c-8af5-382068cddbc7
 # ╠═f69cb982-573f-43c4-8fb0-a1aab6028021
-# ╠═54ebbdff-f0ae-4265-bacf-a0301d5701b0
-# ╠═2d234542-d4bf-41aa-8ed9-9d91b9b69284
-# ╠═ee175b30-0f05-4e91-9a0a-d9ef9f7d5a32
-# ╠═13e53eaf-a09e-45bd-ba81-8bbbd4f48b20
-# ╠═309d3bcc-359d-4cf3-b2f1-28744f4d5cb0
-# ╠═ea2eacce-d6a8-4f00-a04c-101d6918a471
-# ╠═7f14239b-4fb4-4dd7-ab4d-be73bae4ed93
-# ╟─36e0c27b-d77e-4616-a5f9-b11cc56c7f3f
-# ╠═6800885e-c030-46fd-9220-f75ea87dadb0
 # ╟─c97e405d-8601-4634-9a7c-654598dd1200
 # ╟─ab355e93-a064-40e2-a67a-e75cb54efb33
 # ╠═8e462588-c0c1-4e96-a1fe-f2df50a8ec37
@@ -695,7 +1061,6 @@ At this point we should just be able to extract a list of building ids for which
 # ╠═c4b107f9-421b-4c5e-b876-10b9efb4d4c6
 # ╟─11fd74bd-4ebc-4537-bbd9-958761ac7b01
 # ╟─7df29d94-63b7-46dd-8872-a8dbe0e81e38
-# ╠═c5398a9d-e4fd-4703-9676-2e07334caeaf
 # ╟─5a35d191-76e7-447e-841d-881b47ab8d6c
 # ╠═0c000a60-6fe3-464a-a8b6-906e1e94f02d
 # ╠═329d43de-17b6-4d11-a0c8-4cd0a6980932
@@ -706,3 +1071,68 @@ At this point we should just be able to extract a list of building ids for which
 # ╠═f6e0da2e-1394-4945-aee7-67de4ade486c
 # ╠═39fc72af-2262-4597-9c44-c9ccd56b6ec9
 # ╠═3bd5037f-87cf-4988-888f-d62c10de3195
+# ╟─b4d4e254-5198-4b0f-b9e8-054fe97f7f3a
+# ╠═a88489a2-2da2-492e-94d6-7af90feaf92f
+# ╠═6cabf58a-7082-4a18-9dd3-b9334f2ccd9f
+# ╠═edd15ef6-80ca-496d-9073-49a430b9d2ed
+# ╠═621d236a-ce0a-4bf5-9486-d481527d3261
+# ╠═abec0385-4725-4a51-8ef4-bda7cfaede64
+# ╠═ca10ae5a-7a94-42eb-97e0-770e7f781a4c
+# ╠═28a46b6f-ae61-4639-8448-699451ea228c
+# ╠═c92d5491-a044-4943-835c-cc2ecc418208
+# ╠═052750a1-4941-47b8-9b54-518a4bc6cb67
+# ╟─14b73aa8-cdc6-40c9-ac38-39039f19dae7
+# ╟─a1cd7408-c92b-432c-8830-a7d709d7c298
+# ╟─3e5adcf1-0815-41b6-bd06-113cbd35072c
+# ╠═7e1470f0-d52d-48cb-a62a-07acb02e18a5
+# ╠═5c352c0c-0775-446d-b785-e7d9d2677c41
+# ╠═c6e1f5ac-55a0-4175-b05b-236a2eb68561
+# ╟─c7fcad00-fa50-4a3f-ab13-8ac392b7abe7
+# ╠═643e0bbb-89e5-45a5-bcca-991cfc66e85d
+# ╟─1b7432eb-bc8d-4bd1-a19c-06ca71c29786
+# ╟─e6c80d02-1841-4598-bb38-bdb7a06e11ab
+# ╠═f758a6da-9531-4d37-b22b-6902d2466b9b
+# ╠═a68eb98c-3991-452a-b4b8-9564a4890e6a
+# ╟─e00c4191-6ab4-4144-a877-42834d4bb199
+# ╠═b68f0739-3b62-4586-b50f-4654deafce26
+# ╟─9d7307e5-af20-44fd-bf34-793594f65bd6
+# ╠═56d1d77d-d1ca-448a-b5b3-0ff83a1c1141
+# ╠═cabaa3df-3eeb-4982-bd4e-d5b26278302a
+# ╠═d0678256-9f5d-4c1f-bcb3-33f50e9b9f7c
+# ╠═95105b4c-64a5-481e-893b-e915bd46fc1f
+# ╟─e0dda8c5-fffe-4469-9a60-9a5596e21e3a
+# ╠═a50cd1a7-4c17-4b71-91e8-82c3b8acac2f
+# ╠═135cd14a-1e9f-4837-a159-a569ac676b0b
+# ╠═c705fcf9-369c-44da-852b-4ec457f0d5b4
+# ╠═b993865b-cc70-46a0-a87c-8ec56fd58e2a
+# ╠═de137895-c4f4-4233-a4f2-935be5177d85
+# ╠═8bcfc861-0479-4763-a455-f09f4df09186
+# ╠═45abdf93-87e4-455d-8500-55adb51c9c0e
+# ╠═f5db610a-7704-459b-9fb0-ec22c7dbdaee
+# ╠═9145880b-2b40-49d2-815c-bd8cf7e090c2
+# ╠═9f1b44e9-5106-4747-bdbe-84dcda3d9717
+# ╠═6085ae4a-6874-4b38-91b3-5b4b60f3806f
+# ╠═64fefeee-7980-41c2-8a2f-2e539da260a4
+# ╠═2626b03d-e2e8-405e-84a4-ccb5d8432e5c
+# ╠═2f0caff4-5cf0-4c15-a143-9e8ef52a63f0
+# ╠═c29ca84d-fa67-48c1-89c3-347b4ed2de24
+# ╠═0cb33287-09da-47ff-9839-ed7d6b4da7e7
+# ╟─805be959-76eb-4d96-aed4-b9344af198b0
+# ╟─efbb87f4-9ecb-411e-a380-61897a89f178
+# ╟─bcf9c256-c6e7-45a2-b76d-12866bbb038b
+# ╟─9f5a9366-f35a-4639-a141-4341f7ac41f9
+# ╠═8928439e-6d4b-4c65-8edb-0e329f86d4ec
+# ╠═9981f7e4-8aa4-41b0-9827-1e7ed5b86920
+# ╠═e577c8ad-4968-4c97-ba65-aea8b888a493
+# ╠═5379b543-b900-4ffb-a7b9-24107d2c74ef
+# ╠═9eaefae4-4b09-4738-9e6e-cccd9eefc512
+# ╠═656232a8-af8d-4086-b934-606005fd1359
+# ╠═6bb085a2-ab02-4103-9a64-1ada10c8726b
+# ╠═d037b44c-7f84-4b22-8be1-cc644f11bd26
+# ╠═0b1b09b5-d55c-48c1-a876-0783766476cf
+# ╠═55921f40-4103-4606-98cf-287ca8fb9a19
+# ╠═022a9d72-68fb-4764-adbb-9cbe1a6ab44b
+# ╠═d60c9e77-2a3e-4975-a38c-2102af2b8706
+# ╠═af43f162-0f5c-4c0e-ab8d-c6c2032af565
+# ╠═371ee554-2386-45b7-a09b-09b8772cb377
+# ╠═ed6ed540-885a-41e1-9348-27826b74d194
