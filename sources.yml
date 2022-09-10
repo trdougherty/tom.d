@@ -1,4 +1,6 @@
 data-sources:
+  tmy:
+    tmy-format: "https://nsrdb.nrel.gov/data-sets/tmy"
   nyc:
     borough-boundaries: 
       description: "https://data.cityofnewyork.us/City-Government/Borough-Boundaries/tqmj-j8zm"
@@ -35,3 +37,8 @@ data-sources:
       download: "https://data.cityofnewyork.us/api/geospatial/nqwf-w8eh?method=export&format=GeoJSON"
       filetype: "geojson"
       filesize: 826.7
+    tmy-files:
+      description: "https://data.nrel.gov/submissions/156"
+      download: "https://data.nrel.gov/system/files/156/BuildStock_TMY3_FIPS.zip"
+      filetype: "zip"
+      filesize: 750
