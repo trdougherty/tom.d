@@ -1,6 +1,8 @@
 data-sources:
   tmy:
     tmy-format: "https://nsrdb.nrel.gov/data-sets/tmy"
+    tmy-format2: "https://hongyuanjia.github.io/eplusr/reference/Epw.html"
+    epw-format: "https://climate.onebuilding.org/papers/EnergyPlus_Weather_File_Format.pdf"
   nyc:
     borough-boundaries: 
       description: "https://data.cityofnewyork.us/City-Government/Borough-Boundaries/tqmj-j8zm"
