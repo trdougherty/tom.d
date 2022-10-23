@@ -3,6 +3,9 @@
 
 using Markdown
 using InteractiveUtils
+using Distributed
+
+@everywhere println("process: $(myid()) on host $(gethostname())")
 
 # ╔═╡ 1ea68209-380d-4b2e-9239-bedf850b8243
 begin
@@ -347,7 +350,7 @@ md"""(3) *NYC building centroids*"""
 
 # ╔═╡ 34db351a-d5cd-4069-add3-9aa3b4162585
 begin
-	footprints = GeoDataFrames.read(joinpath(data_path, "building-footprints.shp"))
+	footprints = GeoDataFrames.read(joinpath(data_path, "geo_export_1da3ad53-9d44-4fb1-9cbd-fea82034e0f9.shp"))
 
 	rename!(
 		footprints,
