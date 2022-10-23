@@ -1,3 +1,4 @@
+output-destination: /Users/thomas/Desktop/Work/Research/uil/postquals/data_offload/
 data-sources:
   tmy:
     tmy-format: "https://nsrdb.nrel.gov/data-sets/tmy"
@@ -36,8 +37,8 @@ data-sources:
       filesize: 39
     building-footprints:
       description: "https://github.com/CityOfNewYork/nyc-geo-metadata/blob/master/Metadata/Metadata_BuildingFootprints.md"
-      download: "https://data.cityofnewyork.us/api/geospatial/nqwf-w8eh?method=export&format=GeoJSON"
-      filetype: "geojson"
+      download: "https://data.cityofnewyork.us/api/geospatial/nqwf-w8eh?method=export&format=Shapefile"
+      filetype: "shp"
       filesize: 826.7
     tmy-files:
       description: "https://data.nrel.gov/submissions/156"

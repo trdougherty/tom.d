@@ -29,11 +29,14 @@ begin
 	sources_file = joinpath(pwd(), "sources.yml")
 	sources = YAML.load_file(sources_file)
 	nyc_sources = sources["data-sources"]["nyc"]
+
+	data_destination = sources["output-destination"]
 end
 
 # ╔═╡ 3586e907-3244-4126-95f4-c3ae294a38ed
 begin
-	data_base = joinpath(pwd(), "data", "nyc")
+	data_base = joinpath(data_destination, "data", "nyc")
+	@info "Storing data to: " data_base
 	mkpath(data_base)
 end
 
