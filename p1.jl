@@ -3,14 +3,17 @@
 
 using Markdown
 using InteractiveUtils
-using Distributed
-
-@everywhere println("process: $(myid()) on host $(gethostname())")
 
 # ╔═╡ 1ea68209-380d-4b2e-9239-bedf850b8243
 begin
 import Pkg
 Pkg.activate(Base.current_project())
+
+ENV["GKSwstype"] = "100"
+
+using Markdown
+using InteractiveUtils
+using Distributed
 
 using ArchGDAL
 using CSV
@@ -199,7 +202,7 @@ annualₚ = annualₜ.consumption ./ sum(annualₜ.consumption);
 )
 
 # ╔═╡ 3164491c-df20-4384-8045-e270d82317d7
-draw(PNG(joinpath(output_dir, "energy_usetypes_nyc.png"), 14cm, 7cm, dpi=600), α₁)
+# draw(PNG(joinpath(output_dir, "energy_usetypes_nyc.png"), 14cm, 7cm, dpi=600), α₁)
 
 # ╔═╡ 6ceeb173-c9b4-4daa-be6b-0097c926885c
 # ℓ = Gadfly.plot(

@@ -4,8 +4,11 @@
 #SBATCH --nodes 2
 #SBATCH --ntasks-per-node 4
 #SBATCH --time=00:10:00
-#SBATCH --output=slurm-output.out
-#SBATCH --error=slurm-error.err
+#SBATCH --output=slurm-p1.out
+#SBATCH --error=slurm-p1.err
 
+ml system
+ml cairo
 ml julia
-julia --machine-file <(srun hostname -s) ./p1.jl
+
+julia --project=@. --machine-file <(srun hostname -s) p1.jl
