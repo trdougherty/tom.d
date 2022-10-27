@@ -8,18 +8,19 @@ using InteractiveUtils
 begin
 	import Pkg
 	Pkg.activate(Base.current_project())
+
+	using Cairo
+	using Fontconfig
+
 	using CSV
 	using DataFrames
 	using DataStructures
 	using Dates
 	using Gadfly
 	using GeoDataFrames
-	using Plots
 	using Statistics
 	using UnicodePlots
 	using YAML
-
-	import Cairo, Fontconfig
 end;
 
 # ╔═╡ 786c2441-7abb-4caa-9f50-c6078fff0f56
@@ -31,12 +32,19 @@ using MLJ
 # ╔═╡ b6d7cd90-0d59-4194-91c8-6d8f40a4a9c3
 using StatsBase
 
+# ╔═╡ 982250e8-58ad-483d-87b5-f6aff464bd10
+begin
+end
+
 # ╔═╡ 9b3790d3-8d5d-403c-8495-45def2c6f8ba
 md"""
 ### Section 1: Data Cleansing and Loading
 ---
 This preliminary section will first load each of the data elements used in the analysis and prepare them for merging prior to a learning pipeline
 """
+
+# ╔═╡ bf772ea4-c9ad-4fe7-9436-9799dcb0ad04
+date_f = "yyyy-mm-dd HH:MM:SS"
 
 # ╔═╡ 020b96e3-d218-470d-b4b0-fc9b708ffdf3
 begin
@@ -48,7 +56,6 @@ begin
 	input_dir = joinpath(data_path, "p1_o")
 	input_dir_environmental = joinpath(data_path, "p2_o")
 	output_dir = joinpath(data_path, "p3_o")
-	mkpath(output_dir)
 end;
 
 # ╔═╡ 9aa06073-d43e-4658-adb9-bbc11425978d
@@ -104,37 +111,6 @@ epw_r = CSV.read(epw_p, DataFrame);
 # ╔═╡ 44e4ebf2-f3b8-4be4-a6b9-06822230d947
 
 
-# ╔═╡ dc5167ab-6c65-4916-be18-c635b04f0c0d
-sar_p = joinpath(input_dir_environmental, "sar.csv")
-
-# ╔═╡ fe529a32-ab71-4e5d-a593-45085d69f580
-# Gadfly.plot(
-# 	dropmissing(sar_r, :VV),
-# 	x=:date,
-# 	y=:VV,
-# 	color="Property Id",
-# 	Geom.point,
-# 	Geom.line,
-# 	# Coord.cartesian(ymin=37.57, ymax=37.6),
-# 	Theme(default_color="black", point_size=2pt)
-# )
-
-# ╔═╡ c65e56e9-0bde-4278-819c-f3148d71668b
-begin
-	# the _r prefix is meant to denote that these are closer to "raw" data
-	date_f = "yyyy-mm-dd HH:MM:SS"
-	era5_r = CSV.read(era5_p, DataFrame; dateformat=date_f)
-	landsat8_r = CSV.read(landsat8_p, DataFrame; dateformat=date_f)
-	lst_aqua_r = CSV.read(lst_aqua_p, DataFrame; dateformat=date_f)
-	lst_terra_r = CSV.read(lst_terra_p, DataFrame; dateformat=date_f)
-	lst_r = vcat(lst_aqua_r, lst_terra_r)
-	
-	noaa_r = CSV.read(noaa_p, DataFrame; dateformat=date_f)
-	sentinel_1C_r = CSV.read(sentinel_1C_p, DataFrame; dateformat=date_f)
-	sentinel_2A_r = CSV.read(sentinel_2A_p, DataFrame; dateformat=date_f)
-	viirs_r = CSV.read(viirs_p, DataFrame; dateformat=date_f)
-end;
-
 # ╔═╡ 79fed5b6-3842-47b7-8918-63f918e070bb
 begin
 	dynam_p = joinpath(input_dir_environmental, "dynamicworld.csv")
@@ -143,6 +119,9 @@ end
 
 # ╔═╡ cfc6d000-3338-468a-a1f8-e3d0b3c9881d
 describe(dynam_r, :nmissing)
+
+# ╔═╡ dc5167ab-6c65-4916-be18-c635b04f0c0d
+sar_p = joinpath(input_dir_environmental, "sar.csv")
 
 # ╔═╡ e33201c0-678e-4ffc-9310-2420ea65aced
 sar_r = CSV.read(sar_p, DataFrame; dateformat=date_f)
@@ -160,6 +139,9 @@ Gadfly.plot(
 	Geom.histogram
 )
 
+# ╔═╡ 00acb065-2378-4181-b76a-488071f43a7e
+
+
 # ╔═╡ 7d13349f-c3a4-40e7-b7d3-be2e0e951dd5
 filter( x -> x["Property Id"] == 6683659, sar_r )
 
@@ -173,6 +155,18 @@ Gadfly.plot(
 	# Coord.cartesian(ymin=37.57, ymax=37.6),
 	Theme(default_color="black", point_size=2pt)
 )
+
+# ╔═╡ fe529a32-ab71-4e5d-a593-45085d69f580
+# Gadfly.plot(
+# 	dropmissing(sar_r, :VV),
+# 	x=:date,
+# 	y=:VV,
+# 	color="Property Id",
+# 	Geom.point,
+# 	Geom.line,
+# 	# Coord.cartesian(ymin=37.57, ymax=37.6),
+# 	Theme(default_color="black", point_size=2pt)
+# )
 
 # ╔═╡ a536094d-3894-4ce7-95cd-f38a3666e07e
 VV_councilmedian = combine(groupby(innerjoin(dropmissing(sar_r, :VH), train[:,["Property Id","council_region"]], on="Property Id"), ["date","council_region"]), :VH => mean, renamecols=false)
@@ -191,6 +185,21 @@ Gadfly.plot(
 
 # ╔═╡ 217c69fd-380b-4240-8078-68a54e8eafde
 describe(sar_r, :nmissing)
+
+# ╔═╡ c65e56e9-0bde-4278-819c-f3148d71668b
+begin
+	# the _r prefix is meant to denote that these are closer to "raw" data
+	era5_r = CSV.read(era5_p, DataFrame; dateformat=date_f)
+	landsat8_r = CSV.read(landsat8_p, DataFrame; dateformat=date_f)
+	lst_aqua_r = CSV.read(lst_aqua_p, DataFrame; dateformat=date_f)
+	lst_terra_r = CSV.read(lst_terra_p, DataFrame; dateformat=date_f)
+	lst_r = vcat(lst_aqua_r, lst_terra_r)
+	
+	noaa_r = CSV.read(noaa_p, DataFrame; dateformat=date_f)
+	sentinel_1C_r = CSV.read(sentinel_1C_p, DataFrame; dateformat=date_f)
+	sentinel_2A_r = CSV.read(sentinel_2A_p, DataFrame; dateformat=date_f)
+	viirs_r = CSV.read(viirs_p, DataFrame; dateformat=date_f)
+end;
 
 # ╔═╡ 348c4307-94dc-4d5f-82b0-77dc535c1650
 function strip_month!(data::DataFrame)
@@ -1912,10 +1921,12 @@ Gadfly.plot(
 )
 
 # ╔═╡ Cell order:
+# ╠═982250e8-58ad-483d-87b5-f6aff464bd10
 # ╠═ac97e0d6-2cfa-11ed-05b5-13b524a094e3
 # ╠═786c2441-7abb-4caa-9f50-c6078fff0f56
 # ╠═1c7bfba6-5e1d-457d-bd92-8ba445353e0b
 # ╟─9b3790d3-8d5d-403c-8495-45def2c6f8ba
+# ╠═bf772ea4-c9ad-4fe7-9436-9799dcb0ad04
 # ╠═020b96e3-d218-470d-b4b0-fc9b708ffdf3
 # ╠═9aa06073-d43e-4658-adb9-bbc11425978d
 # ╠═4f1c0eae-e637-40f8-95a9-61088e423725
@@ -1931,6 +1942,7 @@ Gadfly.plot(
 # ╠═a2e624f7-5626-431a-9680-f62ed86b61aa
 # ╠═db7c092f-5fa8-4038-b9cf-d40d822a4b9a
 # ╠═d3d814ee-ad4f-47bf-966a-08cabc79bf90
+# ╠═00acb065-2378-4181-b76a-488071f43a7e
 # ╠═7d13349f-c3a4-40e7-b7d3-be2e0e951dd5
 # ╠═44d399f7-268b-4e66-8ba9-fe2e8e17a19d
 # ╠═fe529a32-ab71-4e5d-a593-45085d69f580
