@@ -190,15 +190,15 @@ describe(sar_r, :nmissing)
 begin
 	# the _r prefix is meant to denote that these are closer to "raw" data
 	era5_r = CSV.read(era5_p, DataFrame; dateformat=date_f)
-	landsat8_r = CSV.read(landsat8_p, DataFrame; dateformat=date_f)
+	# landsat8_r = CSV.read(landsat8_p, DataFrame; dateformat=date_f)
 	lst_aqua_r = CSV.read(lst_aqua_p, DataFrame; dateformat=date_f)
 	lst_terra_r = CSV.read(lst_terra_p, DataFrame; dateformat=date_f)
 	lst_r = vcat(lst_aqua_r, lst_terra_r)
 	
 	noaa_r = CSV.read(noaa_p, DataFrame; dateformat=date_f)
-	sentinel_1C_r = CSV.read(sentinel_1C_p, DataFrame; dateformat=date_f)
-	sentinel_2A_r = CSV.read(sentinel_2A_p, DataFrame; dateformat=date_f)
-	viirs_r = CSV.read(viirs_p, DataFrame; dateformat=date_f)
+	# sentinel_1C_r = CSV.read(sentinel_1C_p, DataFrame; dateformat=date_f)
+	# sentinel_2A_r = CSV.read(sentinel_2A_p, DataFrame; dateformat=date_f)
+	# viirs_r = CSV.read(viirs_p, DataFrame; dateformat=date_f)
 end;
 
 # ╔═╡ 348c4307-94dc-4d5f-82b0-77dc535c1650
@@ -216,12 +216,12 @@ begin
 	strip_month!(epw_r)
 
 	strip_month!(era5_r)
-	strip_month!(landsat8_r)
+	# strip_month!(landsat8_r)
 	strip_month!(lst_r)
 	strip_month!(noaa_r)
-	strip_month!(sentinel_1C_r)
-	strip_month!(sentinel_2A_r)
-	strip_month!(viirs_r)
+	# strip_month!(sentinel_1C_r)
+	# strip_month!(sentinel_2A_r)
+	# strip_month!(viirs_r)
 	strip_month!(sar_r)
 end;
 
@@ -244,12 +244,12 @@ begin
 	epw = 			monthly_average(epw_r, agg_terms)
 
 	era5 = 			monthly_average(era5_r, agg_terms)	
-	landsat8 = 		monthly_average(landsat8_r, agg_terms)
+	# landsat8 = 		monthly_average(landsat8_r, agg_terms)
 	lst = 			monthly_average(lst_r, agg_terms)
 	noaa = 			monthly_average(noaa_r, agg_terms)
-	sentinel_1C = 	monthly_average(sentinel_1C_r, agg_terms)
-	sentinel_2A = 	monthly_average(sentinel_2A_r, agg_terms)
-	viirs = 		monthly_average(viirs_r, agg_terms)
+	# sentinel_1C = 	monthly_average(sentinel_1C_r, agg_terms)
+	# sentinel_2A = 	monthly_average(sentinel_2A_r, agg_terms)
+	# viirs = 		monthly_average(viirs_r, agg_terms)
 	sar = 			monthly_average(sar_r, agg_terms)
 	dynam = 		monthly_average(dynam_r, agg_terms)
 end;
@@ -598,8 +598,8 @@ comprehensive_datalist = [
 	era5,
 	epw, 
 	lst, 
-	sentinel_1C, 
-	viirs
+	# sentinel_1C, 
+	# viirs
 ];
 
 # ╔═╡ 0c89dbf1-c714-43da-be89-3f82ccc2373a
@@ -944,99 +944,99 @@ teₐ′₄.model = repeat(["EPW"], nrow(teₐ′₄))
 end;
 
 # ╔═╡ b9b8a050-1824-414e-928d-b7797760f176
-md"""
-###### Sentinel-2
-"""
+# md"""
+# ###### Sentinel-2
+# """
 
-# ╔═╡ e97fd9dc-edb5-41e4-bbaf-dfbb14e7d461
-term₅ = unique([names(sentinel_1C)..., electricity_terms...])
+# # ╔═╡ e97fd9dc-edb5-41e4-bbaf-dfbb14e7d461
+# term₅ = unique([names(sentinel_1C)..., electricity_terms...])
 
-# ╔═╡ 358c345c-108e-4bdf-8a79-9c704b529ce3
-begin
-tₐ′₅ = select(tₐ′, term₅)
-m₅ = training_pipeline(
-	select(tₐ′₅, exclusion_terms),
-	"electricity_mwh",
-	m
-);
-end
+# # ╔═╡ 358c345c-108e-4bdf-8a79-9c704b529ce3
+# begin
+# tₐ′₅ = select(tₐ′, term₅)
+# m₅ = training_pipeline(
+# 	select(tₐ′₅, exclusion_terms),
+# 	"electricity_mwh",
+# 	m
+# );
+# end
 
-# ╔═╡ ad27236b-945e-4ef9-a056-968f5bb9fa93
-begin
-vₐ′₅ = select(vₐ′, term₅)
+# # ╔═╡ ad27236b-945e-4ef9-a056-968f5bb9fa93
+# begin
+# vₐ′₅ = select(vₐ′, term₅)
 
-vₐ′₅.prediction = validation_pipeline(
-	select(vₐ′₅, exclusion_terms),
-	"electricity_mwh",
-	m₅
-);
+# vₐ′₅.prediction = validation_pipeline(
+# 	select(vₐ′₅, exclusion_terms),
+# 	"electricity_mwh",
+# 	m₅
+# );
 
-vₐ′₅.recorded = vₐ′₅.electricity_mwh
-vₐ′₅.model = repeat(["Sentinel-2"], nrow(vₐ′₅))
-end;
+# vₐ′₅.recorded = vₐ′₅.electricity_mwh
+# vₐ′₅.model = repeat(["Sentinel-2"], nrow(vₐ′₅))
+# end;
 
-# ╔═╡ 156ddaf3-c417-49f9-ab9b-382ca47031de
-begin
-teₐ′₅ = select(teₐ′, term₅)
+# # ╔═╡ 156ddaf3-c417-49f9-ab9b-382ca47031de
+# begin
+# teₐ′₅ = select(teₐ′, term₅)
 
-teₐ′₅.prediction = validation_pipeline(
-	select(teₐ′₅, exclusion_terms),
-	"electricity_mwh",
-	m₅
-);
+# teₐ′₅.prediction = validation_pipeline(
+# 	select(teₐ′₅, exclusion_terms),
+# 	"electricity_mwh",
+# 	m₅
+# );
 
-teₐ′₅.recorded = teₐ′₅.electricity_mwh
-teₐ′₅.model = repeat(["Sentinel-2"], nrow(teₐ′₅))
-end;
+# teₐ′₅.recorded = teₐ′₅.electricity_mwh
+# teₐ′₅.model = repeat(["Sentinel-2"], nrow(teₐ′₅))
+# end;
 
-# ╔═╡ a6cada88-c7c9-495d-8806-2503e674ec39
-md"""
-###### VIIRS
-"""
+# # ╔═╡ a6cada88-c7c9-495d-8806-2503e674ec39
+# md"""
+# ###### VIIRS
+# """
 
-# ╔═╡ 7c84422b-d522-4f11-9465-058f41a4266f
-term₆ = unique([names(viirs)..., electricity_terms...])
+# # ╔═╡ 7c84422b-d522-4f11-9465-058f41a4266f
+# term₆ = unique([names(viirs)..., electricity_terms...])
 
-# ╔═╡ 9666648a-42e2-4237-a4a4-71f0d5abf46c
-begin
-tₐ′₆ = select(tₐ′, term₆)
-m₆ = training_pipeline(
-	select(tₐ′₆, exclusion_terms),
-	"electricity_mwh",
-	m
-);
-end
+# # ╔═╡ 9666648a-42e2-4237-a4a4-71f0d5abf46c
+# begin
+# tₐ′₆ = select(tₐ′, term₆)
+# m₆ = training_pipeline(
+# 	select(tₐ′₆, exclusion_terms),
+# 	"electricity_mwh",
+# 	m
+# );
+# end
 
-# ╔═╡ c5b5b147-22ec-432b-ab20-111f6a759101
-begin
-vₐ′₆ = select(vₐ′, term₆)
+# # ╔═╡ c5b5b147-22ec-432b-ab20-111f6a759101
+# begin
+# vₐ′₆ = select(vₐ′, term₆)
 
-vₐ′₆.prediction = validation_pipeline(
-	select(vₐ′₆, exclusion_terms),
-	"electricity_mwh",
-	m₆
-);
+# vₐ′₆.prediction = validation_pipeline(
+# 	select(vₐ′₆, exclusion_terms),
+# 	"electricity_mwh",
+# 	m₆
+# );
 
-vₐ′₆.recorded = vₐ′₆.electricity_mwh
-vₐ′₆.model = repeat(["VIIRS"], nrow(vₐ′₆))
-end;
+# vₐ′₆.recorded = vₐ′₆.electricity_mwh
+# vₐ′₆.model = repeat(["VIIRS"], nrow(vₐ′₆))
+# end;
 
-# ╔═╡ 6066527e-c75a-4305-8a34-0cc98c4b3a91
-begin
-teₐ′₆ = select(teₐ′, term₆)
+# # ╔═╡ 6066527e-c75a-4305-8a34-0cc98c4b3a91
+# begin
+# teₐ′₆ = select(teₐ′, term₆)
 
-teₐ′₆.prediction = validation_pipeline(
-	select(teₐ′₆, exclusion_terms),
-	"electricity_mwh",
-	m₆
-);
+# teₐ′₆.prediction = validation_pipeline(
+# 	select(teₐ′₆, exclusion_terms),
+# 	"electricity_mwh",
+# 	m₆
+# );
 
-teₐ′₆.recorded = teₐ′₆.electricity_mwh
-teₐ′₆.model = repeat(["VIIRS"], nrow(teₐ′₆))
-end;
+# teₐ′₆.recorded = teₐ′₆.electricity_mwh
+# teₐ′₆.model = repeat(["VIIRS"], nrow(teₐ′₆))
+# end;
 
 # ╔═╡ 24f60a4e-7c69-4ff9-b284-eb9418b7a496
-test_terms = [teₐ′₀,teₐ′₁,teₐ′₂,teₐ′₃,teₐ′₄,teₐ′₅];
+test_terms = [teₐ′₀,teₐ′₁,teₐ′₂,teₐ′₃,teₐ′₄] #,teₐ′₅];
 
 # ╔═╡ ed696113-737b-46f5-bfb1-c06d430a83ac
 seasons = Dict(
