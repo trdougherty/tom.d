@@ -242,7 +242,10 @@ function monthly_aggregation(data::DataFrame, agg_terms::Vector{String})
 	functional_terms = [f₁ f₂ f₃]
 	numericterms = filter(term -> term ∉ agg_terms, names(data, Real))
 	combine(
-		groupby(data, agg_terms), 
+		groupby(
+			disallowmissing!(data[completecases(data), :]), 
+			agg_terms
+			), 
 		numericterms .=> functional_terms, 
 		renamecols=true
 	)
