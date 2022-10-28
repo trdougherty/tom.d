@@ -230,12 +230,22 @@ end;
 strip_month!(dynam_r)
 
 # ╔═╡ e87d641a-9555-4a93-9fe8-f39f8964ce84
-
+begin
+	f₁(x) = percentile(x, 50)
+	f₂(x) = percentile(x, 5)
+	f₃(x) = percentile(x, 95)
+end
 
 # ╔═╡ ac31e0ac-b35b-494f-814c-3f9eaf26e8b1
 function monthly_average(data::DataFrame, agg_terms::Vector{String})
-	meanterms = filter(term -> term ∉ agg_terms, names(data))
-	combine(groupby(data, agg_terms), meanterms .=> mean ∘ skipmissing, renamecols=false)
+	agg_terms = ["Property Id", "date"]
+	functional_terms = [f₁ f₂ f₃]
+	numericterms = filter(term -> term ∉ agg_terms, names(data, Real))
+	combine(
+		groupby(data, agg_terms), 
+		numericterms .=> functional_terms, 
+		renamecols=true
+	)
 end
 
 # ╔═╡ 637220ba-c76a-4210-8c08-fde56b86366a
