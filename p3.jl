@@ -124,19 +124,20 @@ describe(dynam_r, :nmissing)
 sar_p = joinpath(input_dir_environmental, "sar.csv")
 
 # ╔═╡ e33201c0-678e-4ffc-9310-2420ea65aced
-sar_r = CSV.read(sar_p, DataFrame; dateformat=date_f)
+sar_r = CSV.read(sar_p, DataFrame; dateformat=date_f);
 
 # ╔═╡ a2e624f7-5626-431a-9680-f62ed86b61aa
 combine(groupby(sar_r, :date), first)
 
 # ╔═╡ db7c092f-5fa8-4038-b9cf-d40d822a4b9a
-Set(values(countmap(dropmissing(sar_r, [:HH] )[:,"Property Id"])))
+# Set(values(countmap(dropmissing(sar_r, [:HH] )[:,"Property Id"])))
 
 # ╔═╡ d3d814ee-ad4f-47bf-966a-08cabc79bf90
 Gadfly.plot(
 	filter( x -> x.date == DateTime("2019-04-20T22:51:04"), sar_r ),
-	x=:HH,
-	Geom.histogram
+	x=:VV,
+	Geom.histogram,
+	Theme(default_color="black")
 )
 
 # ╔═╡ 00acb065-2378-4181-b76a-488071f43a7e
@@ -190,15 +191,15 @@ describe(sar_r, :nmissing)
 begin
 	# the _r prefix is meant to denote that these are closer to "raw" data
 	era5_r = CSV.read(era5_p, DataFrame; dateformat=date_f)
-	# landsat8_r = CSV.read(landsat8_p, DataFrame; dateformat=date_f)
+	landsat8_r = CSV.read(landsat8_p, DataFrame; dateformat=date_f)
 	lst_aqua_r = CSV.read(lst_aqua_p, DataFrame; dateformat=date_f)
 	lst_terra_r = CSV.read(lst_terra_p, DataFrame; dateformat=date_f)
 	lst_r = vcat(lst_aqua_r, lst_terra_r)
 	
 	noaa_r = CSV.read(noaa_p, DataFrame; dateformat=date_f)
-	# sentinel_1C_r = CSV.read(sentinel_1C_p, DataFrame; dateformat=date_f)
-	# sentinel_2A_r = CSV.read(sentinel_2A_p, DataFrame; dateformat=date_f)
-	# viirs_r = CSV.read(viirs_p, DataFrame; dateformat=date_f)
+	sentinel_1C_r = CSV.read(sentinel_1C_p, DataFrame; dateformat=date_f)
+	sentinel_2A_r = CSV.read(sentinel_2A_p, DataFrame; dateformat=date_f)
+	viirs_r = CSV.read(viirs_p, DataFrame; dateformat=date_f)
 end;
 
 # ╔═╡ 348c4307-94dc-4d5f-82b0-77dc535c1650
@@ -216,12 +217,12 @@ begin
 	strip_month!(epw_r)
 
 	strip_month!(era5_r)
-	# strip_month!(landsat8_r)
+	strip_month!(landsat8_r)
 	strip_month!(lst_r)
 	strip_month!(noaa_r)
-	# strip_month!(sentinel_1C_r)
-	# strip_month!(sentinel_2A_r)
-	# strip_month!(viirs_r)
+	strip_month!(sentinel_1C_r)
+	strip_month!(sentinel_2A_r)
+	strip_month!(viirs_r)
 	strip_month!(sar_r)
 end;
 
@@ -244,12 +245,12 @@ begin
 	epw = 			monthly_average(epw_r, agg_terms)
 
 	era5 = 			monthly_average(era5_r, agg_terms)	
-	# landsat8 = 		monthly_average(landsat8_r, agg_terms)
+	landsat8 = 		monthly_average(landsat8_r, agg_terms)
 	lst = 			monthly_average(lst_r, agg_terms)
 	noaa = 			monthly_average(noaa_r, agg_terms)
-	# sentinel_1C = 	monthly_average(sentinel_1C_r, agg_terms)
-	# sentinel_2A = 	monthly_average(sentinel_2A_r, agg_terms)
-	# viirs = 		monthly_average(viirs_r, agg_terms)
+	sentinel_1C = 	monthly_average(sentinel_1C_r, agg_terms)
+	sentinel_2A = 	monthly_average(sentinel_2A_r, agg_terms)
+	viirs = 		monthly_average(viirs_r, agg_terms)
 	sar = 			monthly_average(sar_r, agg_terms)
 	dynam = 		monthly_average(dynam_r, agg_terms)
 end;
@@ -948,10 +949,15 @@ end;
 # ###### Sentinel-2
 # """
 
-# # ╔═╡ e97fd9dc-edb5-41e4-bbaf-dfbb14e7d461
-# term₅ = unique([names(sentinel_1C)..., electricity_terms...])
 
-# # ╔═╡ 358c345c-108e-4bdf-8a79-9c704b529ce3
+
+# ╔═╡ e97fd9dc-edb5-41e4-bbaf-dfbb14e7d461
+term₅ = unique([names(sentinel_1C)..., electricity_terms...])
+
+# ╔═╡ 72ddc0a4-b3a6-45c4-9c78-44bf8a985279
+
+
+# ╔═╡ 358c345c-108e-4bdf-8a79-9c704b529ce3
 # begin
 # tₐ′₅ = select(tₐ′, term₅)
 # m₅ = training_pipeline(
@@ -961,7 +967,9 @@ end;
 # );
 # end
 
-# # ╔═╡ ad27236b-945e-4ef9-a056-968f5bb9fa93
+
+
+# ╔═╡ ad27236b-945e-4ef9-a056-968f5bb9fa93
 # begin
 # vₐ′₅ = select(vₐ′, term₅)
 
@@ -975,7 +983,9 @@ end;
 # vₐ′₅.model = repeat(["Sentinel-2"], nrow(vₐ′₅))
 # end;
 
-# # ╔═╡ 156ddaf3-c417-49f9-ab9b-382ca47031de
+
+
+# ╔═╡ 156ddaf3-c417-49f9-ab9b-382ca47031de
 # begin
 # teₐ′₅ = select(teₐ′, term₅)
 
@@ -989,15 +999,21 @@ end;
 # teₐ′₅.model = repeat(["Sentinel-2"], nrow(teₐ′₅))
 # end;
 
-# # ╔═╡ a6cada88-c7c9-495d-8806-2503e674ec39
+
+
+# ╔═╡ a6cada88-c7c9-495d-8806-2503e674ec39
 # md"""
 # ###### VIIRS
 # """
 
-# # ╔═╡ 7c84422b-d522-4f11-9465-058f41a4266f
+
+
+# ╔═╡ 7c84422b-d522-4f11-9465-058f41a4266f
 # term₆ = unique([names(viirs)..., electricity_terms...])
 
-# # ╔═╡ 9666648a-42e2-4237-a4a4-71f0d5abf46c
+
+
+# ╔═╡ 9666648a-42e2-4237-a4a4-71f0d5abf46c
 # begin
 # tₐ′₆ = select(tₐ′, term₆)
 # m₆ = training_pipeline(
@@ -1007,7 +1023,9 @@ end;
 # );
 # end
 
-# # ╔═╡ c5b5b147-22ec-432b-ab20-111f6a759101
+
+
+# ╔═╡ c5b5b147-22ec-432b-ab20-111f6a759101
 # begin
 # vₐ′₆ = select(vₐ′, term₆)
 
@@ -1021,7 +1039,9 @@ end;
 # vₐ′₆.model = repeat(["VIIRS"], nrow(vₐ′₆))
 # end;
 
-# # ╔═╡ 6066527e-c75a-4305-8a34-0cc98c4b3a91
+
+
+# ╔═╡ 6066527e-c75a-4305-8a34-0cc98c4b3a91
 # begin
 # teₐ′₆ = select(teₐ′, term₆)
 
@@ -1983,7 +2003,7 @@ Gadfly.plot(
 # ╠═f73ae203-056b-400b-8457-6245e9283ead
 # ╠═f3da6fb8-a85b-4dfc-a307-bc987239abc6
 # ╟─54f438b0-893e-42d3-a0f5-2364723be84e
-# ╟─c6f4308d-6dce-4a57-b411-6327f4aa87a7
+# ╠═c6f4308d-6dce-4a57-b411-6327f4aa87a7
 # ╠═c6c038f0-cf8b-4234-a64c-75616fdc07a5
 # ╠═1a5ab262-0493-470f-ab58-baa5fa1a69af
 # ╠═b5dff4f2-3088-4301-8dfe-96fb8c6999c7
@@ -2053,6 +2073,7 @@ Gadfly.plot(
 # ╠═acdb3544-c64f-405a-afd7-fa0c40d27844
 # ╟─b9b8a050-1824-414e-928d-b7797760f176
 # ╠═e97fd9dc-edb5-41e4-bbaf-dfbb14e7d461
+# ╠═72ddc0a4-b3a6-45c4-9c78-44bf8a985279
 # ╠═358c345c-108e-4bdf-8a79-9c704b529ce3
 # ╠═ad27236b-945e-4ef9-a056-968f5bb9fa93
 # ╠═156ddaf3-c417-49f9-ab9b-382ca47031de
