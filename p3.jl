@@ -237,7 +237,7 @@ begin
 end
 
 # ╔═╡ ac31e0ac-b35b-494f-814c-3f9eaf26e8b1
-function monthly_average(data::DataFrame, agg_terms::Vector{String})
+function monthly_aggregation(data::DataFrame, agg_terms::Vector{String})
 	agg_terms = ["Property Id", "date"]
 	functional_terms = [f₁ f₂ f₃]
 	numericterms = filter(term -> term ∉ agg_terms, names(data, Real))
@@ -252,31 +252,31 @@ end
 begin
 	agg_terms = 	["Property Id","date"]
 
-	epw = 			monthly_average(epw_r, agg_terms)
+	epw = 			monthly_aggregation(epw_r, agg_terms)
 
-	era5 = 			monthly_average(era5_r, agg_terms)	
-	landsat8 = 		monthly_average(landsat8_r, agg_terms)
-	lst = 			monthly_average(lst_r, agg_terms)
-	noaa = 			monthly_average(noaa_r, agg_terms)
-	sentinel_1C = 	monthly_average(sentinel_1C_r, agg_terms)
-	sentinel_2A = 	monthly_average(sentinel_2A_r, agg_terms)
-	viirs = 		monthly_average(viirs_r, agg_terms)
-	sar = 			monthly_average(sar_r, agg_terms)
-	dynam = 		monthly_average(dynam_r, agg_terms)
+	era5 = 			monthly_aggregation(era5_r, agg_terms)	
+	landsat8 = 		monthly_aggregation(landsat8_r, agg_terms)
+	lst = 			monthly_aggregation(lst_r, agg_terms)
+	noaa = 			monthly_aggregation(noaa_r, agg_terms)
+	sentinel_1C = 	monthly_aggregation(sentinel_1C_r, agg_terms)
+	sentinel_2A = 	monthly_aggregation(sentinel_2A_r, agg_terms)
+	viirs = 		monthly_aggregation(viirs_r, agg_terms)
+	sar = 			monthly_aggregation(sar_r, agg_terms)
+	dynam = 		monthly_aggregation(dynam_r, agg_terms)
 end;
 
 # ╔═╡ ee7cd99c-88a3-43d7-8fe6-02285598bd1e
 names(dynam)
 
 # ╔═╡ 09a2d2d3-a468-4760-83de-8c423d4e962b
-Gadfly.plot(
-	filter( x -> x["Property Id"] == 7365, dynam),
-	x=:date,
-	y=:trees,
-	Geom.point,
-	Geom.line,
-	Theme(default_color="forestgreen")
-)
+# Gadfly.plot(
+# 	filter( x -> x["Property Id"] == 7365, dynam),
+# 	x=:date,
+# 	y=:trees,
+# 	Geom.point,
+# 	Geom.line,
+# 	Theme(default_color="forestgreen")
+# )
 
 # ╔═╡ 3e648045-0915-4eb6-b037-4c09f1f0036e
 sample_sar = innerjoin(train, sar, on=["Property Id", "date"])
