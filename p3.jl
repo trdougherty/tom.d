@@ -133,12 +133,12 @@ combine(groupby(sar_r, :date), first)
 # Set(values(countmap(dropmissing(sar_r, [:HH] )[:,"Property Id"])))
 
 # ╔═╡ d3d814ee-ad4f-47bf-966a-08cabc79bf90
-Gadfly.plot(
-	filter( x -> x.date == DateTime("2019-04-20T22:51:04"), sar_r ),
-	x=:VV,
-	Geom.histogram,
-	Theme(default_color="black")
-)
+# Gadfly.plot(
+# 	filter( x -> x.date == DateTime("2019-04-20T22:51:04"), sar_r ),
+# 	x=:VV,
+# 	Geom.histogram,
+# 	Theme(default_color="black")
+# )
 
 # ╔═╡ 00acb065-2378-4181-b76a-488071f43a7e
 
@@ -237,13 +237,18 @@ begin
 end
 
 # ╔═╡ ac31e0ac-b35b-494f-814c-3f9eaf26e8b1
-function monthly_aggregation(data::DataFrame, agg_terms::Vector{String})
+function monthly_aggregation(
+	data::DataFrame, 
+	agg_terms::Vector{String}, 
+	functional_terms::Matrix{Function}
+)
 	agg_terms = ["Property Id", "date"]
-	functional_terms = [f₁ f₂ f₃]
-	numericterms = filter(term -> term ∉ agg_terms, names(data, Real))
+
+	dataᵪ = dropmissing(data)
+	numericterms = filter(term -> term ∉ agg_terms, names(dataᵪ, Real))
 	combine(
 		groupby(
-			disallowmissing!(data[completecases(data), :]), 
+			disallowmissing!(dataᵪ[completecases(dataᵪ), :]), 
 			agg_terms
 			), 
 		numericterms .=> functional_terms, 
@@ -251,21 +256,38 @@ function monthly_aggregation(data::DataFrame, agg_terms::Vector{String})
 	)
 end
 
+# ╔═╡ ded91d3d-b496-4f2b-ba40-251e9caf9731
+sarᵤ = combine(groupby(sar_r, ["Property Id", "date"]), names(sar_r, Union{Real, Missing}) .=> mean ∘ skipmissing)
+
+# ╔═╡ ad12869b-dd8b-4503-9451-f57df71a2059
+sort(unique(sarᵤ.date))
+
+# ╔═╡ 9a25655d-1470-449c-aae8-2772cb5b4e5e
+select(sar_r, Not([:HH, :VV, :VH]))
+
+# ╔═╡ 6a900aa1-1f86-4174-a82a-be6642a70e8f
+describe(sentinel_2A_r, :nmissing)
+
 # ╔═╡ 637220ba-c76a-4210-8c08-fde56b86366a
 begin
 	agg_terms = 	["Property Id","date"]
+	functional_terms = [f₁ f₂ f₃]
 
-	epw = 			monthly_aggregation(epw_r, agg_terms)
+	epw = 			monthly_aggregation(epw_r, agg_terms, functional_terms)
 
-	era5 = 			monthly_aggregation(era5_r, agg_terms)	
-	landsat8 = 		monthly_aggregation(landsat8_r, agg_terms)
-	lst = 			monthly_aggregation(lst_r, agg_terms)
-	noaa = 			monthly_aggregation(noaa_r, agg_terms)
-	sentinel_1C = 	monthly_aggregation(sentinel_1C_r, agg_terms)
-	sentinel_2A = 	monthly_aggregation(sentinel_2A_r, agg_terms)
-	viirs = 		monthly_aggregation(viirs_r, agg_terms)
-	sar = 			monthly_aggregation(sar_r, agg_terms)
-	dynam = 		monthly_aggregation(dynam_r, agg_terms)
+	era5 = 			monthly_aggregation(era5_r, agg_terms, functional_terms)	
+	landsat8 = 		monthly_aggregation(landsat8_r, agg_terms, functional_terms)
+	lst = 			monthly_aggregation(lst_r, agg_terms, functional_terms)
+	noaa = 			monthly_aggregation(noaa_r, agg_terms, functional_terms)
+	sentinel_1C = 	monthly_aggregation(sentinel_1C_r, agg_terms, functional_terms)
+	sentinel_2A = 	monthly_aggregation(sentinel_2A_r, agg_terms, functional_terms)
+	viirs = 		monthly_aggregation(viirs_r, agg_terms, functional_terms)
+	sar = 			monthly_aggregation(
+						select(sar_r, Not([:HH, :VV, :VH])), 
+						agg_terms,
+						[mean]
+					)
+	dynam = 		monthly_aggregation(dynam_r, agg_terms, functional_terms)
 end;
 
 # ╔═╡ ee7cd99c-88a3-43d7-8fe6-02285598bd1e
@@ -606,14 +628,20 @@ md"""
 ###### Electricity Data Cleaning and Prep
 """
 
+# ╔═╡ 570539f1-85f6-4127-8c19-92b677ead8b8
+unique(sar.date)
+
+# ╔═╡ bc3171bd-fd33-41d3-9661-1c1608272627
+filter( x-> x["Property Id"] == 1296055, sar )
+
 # ╔═╡ a157969b-100a-4794-a78e-2f40439e28d9
 comprehensive_datalist = [
 	noaa,
 	era5,
 	epw, 
 	lst, 
-	# sentinel_1C, 
-	# viirs
+	sentinel_1C, 
+	viirs
 ];
 
 # ╔═╡ 0c89dbf1-c714-43da-be89-3f82ccc2373a
@@ -623,6 +651,9 @@ tₐ′ = dropmissing(clean(innerjoin(
 	comprehensive_datalist...,
 	on=["Property Id", "date"]
 )));
+
+# ╔═╡ e16ea364-ee01-46d2-ab1b-9da4dd057616
+nrow(tₐ′)
 
 # ╔═╡ 960d4a47-c701-42c5-934e-a80d74b7ddbd
 # property_counts = countmap(complete_training_data[:,"Property Id"])
@@ -731,6 +762,9 @@ Null model
 
 # ╔═╡ 748321c3-0956-4439-90d4-e74598d83f20
 term₀ = unique([electricity_terms...])
+
+# ╔═╡ 05084413-9620-40ca-9f9f-98efea6f65a0
+tₐ′
 
 # ╔═╡ 844b35d3-6ff2-42bd-9fbe-d20cfd9d856f
 begin
@@ -967,52 +1001,43 @@ end;
 # ╔═╡ e97fd9dc-edb5-41e4-bbaf-dfbb14e7d461
 term₅ = unique([names(sentinel_1C)..., electricity_terms...])
 
-# ╔═╡ 72ddc0a4-b3a6-45c4-9c78-44bf8a985279
-
-
 # ╔═╡ 358c345c-108e-4bdf-8a79-9c704b529ce3
-# begin
-# tₐ′₅ = select(tₐ′, term₅)
-# m₅ = training_pipeline(
-# 	select(tₐ′₅, exclusion_terms),
-# 	"electricity_mwh",
-# 	m
-# );
-# end
-
-
+begin
+tₐ′₅ = select(tₐ′, term₅)
+m₅ = training_pipeline(
+	select(tₐ′₅, exclusion_terms),
+	"electricity_mwh",
+	m
+);
+end
 
 # ╔═╡ ad27236b-945e-4ef9-a056-968f5bb9fa93
-# begin
-# vₐ′₅ = select(vₐ′, term₅)
+begin
+vₐ′₅ = select(vₐ′, term₅)
 
-# vₐ′₅.prediction = validation_pipeline(
-# 	select(vₐ′₅, exclusion_terms),
-# 	"electricity_mwh",
-# 	m₅
-# );
+vₐ′₅.prediction = validation_pipeline(
+	select(vₐ′₅, exclusion_terms),
+	"electricity_mwh",
+	m₅
+);
 
-# vₐ′₅.recorded = vₐ′₅.electricity_mwh
-# vₐ′₅.model = repeat(["Sentinel-2"], nrow(vₐ′₅))
-# end;
-
-
+vₐ′₅.recorded = vₐ′₅.electricity_mwh
+vₐ′₅.model = repeat(["Sentinel-2"], nrow(vₐ′₅))
+end;
 
 # ╔═╡ 156ddaf3-c417-49f9-ab9b-382ca47031de
-# begin
-# teₐ′₅ = select(teₐ′, term₅)
+begin
+teₐ′₅ = select(teₐ′, term₅)
 
-# teₐ′₅.prediction = validation_pipeline(
-# 	select(teₐ′₅, exclusion_terms),
-# 	"electricity_mwh",
-# 	m₅
-# );
+teₐ′₅.prediction = validation_pipeline(
+	select(teₐ′₅, exclusion_terms),
+	"electricity_mwh",
+	m₅
+);
 
-# teₐ′₅.recorded = teₐ′₅.electricity_mwh
-# teₐ′₅.model = repeat(["Sentinel-2"], nrow(teₐ′₅))
-# end;
-
-
+teₐ′₅.recorded = teₐ′₅.electricity_mwh
+teₐ′₅.model = repeat(["Sentinel-2"], nrow(teₐ′₅))
+end;
 
 # ╔═╡ a6cada88-c7c9-495d-8806-2503e674ec39
 # md"""
@@ -1022,51 +1047,45 @@ term₅ = unique([names(sentinel_1C)..., electricity_terms...])
 
 
 # ╔═╡ 7c84422b-d522-4f11-9465-058f41a4266f
-# term₆ = unique([names(viirs)..., electricity_terms...])
-
-
+term₆ = unique([names(viirs)..., electricity_terms...])
 
 # ╔═╡ 9666648a-42e2-4237-a4a4-71f0d5abf46c
-# begin
-# tₐ′₆ = select(tₐ′, term₆)
-# m₆ = training_pipeline(
-# 	select(tₐ′₆, exclusion_terms),
-# 	"electricity_mwh",
-# 	m
-# );
-# end
-
-
+begin
+tₐ′₆ = select(tₐ′, term₆)
+m₆ = training_pipeline(
+	select(tₐ′₆, exclusion_terms),
+	"electricity_mwh",
+	m
+);
+end
 
 # ╔═╡ c5b5b147-22ec-432b-ab20-111f6a759101
-# begin
-# vₐ′₆ = select(vₐ′, term₆)
+begin
+vₐ′₆ = select(vₐ′, term₆)
 
-# vₐ′₆.prediction = validation_pipeline(
-# 	select(vₐ′₆, exclusion_terms),
-# 	"electricity_mwh",
-# 	m₆
-# );
+vₐ′₆.prediction = validation_pipeline(
+	select(vₐ′₆, exclusion_terms),
+	"electricity_mwh",
+	m₆
+);
 
-# vₐ′₆.recorded = vₐ′₆.electricity_mwh
-# vₐ′₆.model = repeat(["VIIRS"], nrow(vₐ′₆))
-# end;
-
-
+vₐ′₆.recorded = vₐ′₆.electricity_mwh
+vₐ′₆.model = repeat(["VIIRS"], nrow(vₐ′₆))
+end;
 
 # ╔═╡ 6066527e-c75a-4305-8a34-0cc98c4b3a91
-# begin
-# teₐ′₆ = select(teₐ′, term₆)
+begin
+teₐ′₆ = select(teₐ′, term₆)
 
-# teₐ′₆.prediction = validation_pipeline(
-# 	select(teₐ′₆, exclusion_terms),
-# 	"electricity_mwh",
-# 	m₆
-# );
+teₐ′₆.prediction = validation_pipeline(
+	select(teₐ′₆, exclusion_terms),
+	"electricity_mwh",
+	m₆
+);
 
-# teₐ′₆.recorded = teₐ′₆.electricity_mwh
-# teₐ′₆.model = repeat(["VIIRS"], nrow(teₐ′₆))
-# end;
+teₐ′₆.recorded = teₐ′₆.electricity_mwh
+teₐ′₆.model = repeat(["VIIRS"], nrow(teₐ′₆))
+end;
 
 # ╔═╡ 24f60a4e-7c69-4ff9-b284-eb9418b7a496
 test_terms = [teₐ′₀,teₐ′₁,teₐ′₂,teₐ′₃,teₐ′₄] #,teₐ′₅];
@@ -1124,7 +1143,7 @@ p₄ = Gadfly.plot(
 	Guide.title("Mean Electricity Error by Season"),
 	Guide.colorkey(title="Season"),
 	Geom.subplot_grid(
-		Guide.yticks(ticks=-0.005:0.005:0.005),
+		Guide.yticks(ticks=-0.005:0.0025:0.000),
 		Guide.xticks(ticks=1:1:12),
 		Geom.point,
 		Geom.line,
@@ -1452,8 +1471,8 @@ p₈ = Gadfly.plot(
 	Guide.title("Mean Natural Gas Prediction Error by Season"),
 	Guide.colorkey(title="Season"),
 	Geom.subplot_grid(
-		Guide.yticks(ticks=-0.0025:0.0025:0.015),
-		Guide.xticks(ticks=1:1:12),
+		Guide.yticks(ticks=-0.0025:0.0025:0.0075),
+		Guide.xticks(ticks=1:2:12),
 		Geom.point,
 		Geom.line,
 		Geom.hline(color=["pink"], style=:dash),
@@ -1463,6 +1482,9 @@ p₈ = Gadfly.plot(
 	# Theme(default_color="black")
 )
 end
+
+# ╔═╡ 12d56a51-3b34-49c1-ad35-9ecc04b6aa64
+
 
 # ╔═╡ a1e9f1c1-6764-4d03-a14f-a362c0fba808
 draw(PNG(joinpath(output_dir, "naturalgas_seasonal.png"), 14cm, 10cm, dpi=600), p₈)
@@ -1496,7 +1518,7 @@ pᵧ₁ = Gadfly.plot(
 		color=:model,
 		x=:weather_station_distance,
 		y=abs.(test_termsₑᵧ.prediction .- test_termsₑᵧ.recorded),
-		Geom.smooth(smoothing=0.75),
+		Geom.smooth(smoothing=0.5),
 	),
 	Guide.ylabel("Mean Absolute Error - Smoothed"),
 	Guide.xlabel("Distance from Weather Station (m)"),
@@ -1937,9 +1959,6 @@ test_suiteₜᵧđ = leftjoin(
 	on="Property Id"
 );
 
-# ╔═╡ 669a8a80-9bff-432d-b227-cd81ea90cb01
-stack(test_suiteₜᵧđ, 2:4)
-
 # ╔═╡ 4c99c655-ae95-4a28-95c8-e7ca38ddf55f
 Gadfly.plot(
 	stack(test_suiteₜᵧđ, 2:4),
@@ -1988,6 +2007,10 @@ Gadfly.plot(
 # ╠═22494217-9254-4374-8a7d-02528bdd0df3
 # ╠═e87d641a-9555-4a93-9fe8-f39f8964ce84
 # ╠═ac31e0ac-b35b-494f-814c-3f9eaf26e8b1
+# ╠═ded91d3d-b496-4f2b-ba40-251e9caf9731
+# ╠═ad12869b-dd8b-4503-9451-f57df71a2059
+# ╠═9a25655d-1470-449c-aae8-2772cb5b4e5e
+# ╠═6a900aa1-1f86-4174-a82a-be6642a70e8f
 # ╠═637220ba-c76a-4210-8c08-fde56b86366a
 # ╠═ee7cd99c-88a3-43d7-8fe6-02285598bd1e
 # ╠═09a2d2d3-a468-4760-83de-8c423d4e962b
@@ -2034,8 +2057,11 @@ Gadfly.plot(
 # ╟─bb078875-611c-46f6-8631-1befde358054
 # ╠═b6d7cd90-0d59-4194-91c8-6d8f40a4a9c3
 # ╟─df753575-b121-4c3b-a456-cfe4e535c2aa
+# ╠═570539f1-85f6-4127-8c19-92b677ead8b8
+# ╠═bc3171bd-fd33-41d3-9661-1c1608272627
 # ╠═a157969b-100a-4794-a78e-2f40439e28d9
 # ╠═0c89dbf1-c714-43da-be89-3f82ccc2373a
+# ╠═e16ea364-ee01-46d2-ab1b-9da4dd057616
 # ╠═960d4a47-c701-42c5-934e-a80d74b7ddbd
 # ╠═6d873e8f-d3ee-4423-86e7-e8d75abaad38
 # ╠═cb23bb0f-87ad-4a1b-8491-c6db384824da
@@ -2060,6 +2086,7 @@ Gadfly.plot(
 # ╟─fd61e191-3b66-4ebc-b5ec-02a128548ffb
 # ╟─3c41548c-da78-49c5-89a3-455df77bf4fa
 # ╠═748321c3-0956-4439-90d4-e74598d83f20
+# ╠═05084413-9620-40ca-9f9f-98efea6f65a0
 # ╠═844b35d3-6ff2-42bd-9fbe-d20cfd9d856f
 # ╠═43f847df-5247-48b5-8310-986dc7ccb60d
 # ╠═f76ee669-8dd1-42ae-aa30-3cb0d1541aa3
@@ -2086,7 +2113,6 @@ Gadfly.plot(
 # ╠═acdb3544-c64f-405a-afd7-fa0c40d27844
 # ╟─b9b8a050-1824-414e-928d-b7797760f176
 # ╠═e97fd9dc-edb5-41e4-bbaf-dfbb14e7d461
-# ╠═72ddc0a4-b3a6-45c4-9c78-44bf8a985279
 # ╠═358c345c-108e-4bdf-8a79-9c704b529ce3
 # ╠═ad27236b-945e-4ef9-a056-968f5bb9fa93
 # ╠═156ddaf3-c417-49f9-ab9b-382ca47031de
@@ -2137,10 +2163,10 @@ Gadfly.plot(
 # ╠═ee0d413c-a107-4bdc-a08a-52cda6d81573
 # ╠═77456db6-b0fa-4ba6-9d41-1c393f7ddee1
 # ╠═21e706e9-3ce3-4c9b-b279-7abc7b9f8c94
+# ╠═12d56a51-3b34-49c1-ad35-9ecc04b6aa64
 # ╠═a1e9f1c1-6764-4d03-a14f-a362c0fba808
 # ╠═08b888e3-9d37-43a6-9656-4bf6cb62d324
 # ╠═bf71086c-a8f0-4420-b698-73499fec5257
-# ╠═669a8a80-9bff-432d-b227-cd81ea90cb01
 # ╠═4c99c655-ae95-4a28-95c8-e7ca38ddf55f
 # ╠═9da9c2e2-1932-4fb4-9541-9c022b2680b2
 # ╠═66bd7173-15a4-436a-ad63-fe94de054863
