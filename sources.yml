@@ -1,4 +1,4 @@
-output-destination: /Users/thomas/Desktop/Work/Research/uil/postquals/data_offload/
+output-destination: /home/thomas/Work/Research/uil/ml_microclimate/data/
 data-sources:
   tmy:
     tmy-format: "https://nsrdb.nrel.gov/data-sets/tmy"
