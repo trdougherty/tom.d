@@ -1,7 +1,0 @@
-# boundaries - https://www.geoboundaries.org/index.html#getdata # dont forget to cite
-# nyc_council_districts - 
-https://services5.arcgis.com/GfwWNkhOj9bNBqoJ/arcgis/rest/services/NYC_City_Council_Districts_Water_Included/FeatureServer/0/query\?where\=1\=1\&outFields\=\*\&outSR\=4326\&f\=pgeojson
-# building, building_p - https://data.cityofnewyork.us/Housing-Development/Building-Footprints/nqwf-w8eh
-# nyc full borough boundary - https://data.cityofnewyork.us/City-Government/Borough-Boundaries/tqmj-j8zm # these shapes were merged, buffered by 0.05, and convex hull was applied
-# sf counties - https://data.sfgov.org/Geographic-Locations-and-Boundaries/Bay-Area-Counties/s9wg-vcph # same process^
-# energy - 
