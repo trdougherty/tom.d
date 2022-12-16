@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.9
+# v0.19.16
 
 using Markdown
 using InteractiveUtils
@@ -160,6 +160,7 @@ begin
 	linking_data = deepcopy(annual_data)
 	rename!(linking_data, "NYC Borough, Block and Lot (BBL)" => "bbl")
 	select!(linking_data, ["Property Id", "bbl"])
+	dropmissing!(linking_data)
 end
 
 # ╔═╡ 6f6159a2-7910-4483-807b-aeed118f4242
@@ -272,24 +273,67 @@ begin
 	nyc_monthly[:,"naturalgas_mwh"] = nyc_monthly.naturalgas_kbtu ./ 3.412e+6
 end
 
+# ╔═╡ c4599454-cb73-4caf-96eb-0bf3e6ab41b0
+class_mapping = Dict(
+	'R' => "Residential",
+	'C' => "Commercial",
+	'M' => "Manufacturing"
+)
+
+# ╔═╡ 9cb71b9a-872f-473f-97a6-a206770d98f9
+begin
+pluto = dropmissing(CSV.read(
+	joinpath(
+		data_path,
+		"pluto_22v3.csv"
+	),
+	DataFrame
+), [:bbl,:zonedist1])
+
+dropmissing!(pluto, [:bbl,:zonedist1])
+filter!( x -> x.zonedist1[1] ∈ keys(class_mapping), pluto )
+end
+
+# ╔═╡ 61a75e7b-a4f9-43a0-bdc9-115c2302edc5
+class_mapping['R']
+
+# ╔═╡ ec4b943a-de32-4f03-916b-8765c1c08727
+pluto.zone = map( x -> class_mapping[x[1]], pluto.zonedist1 )
+
+# ╔═╡ 2b2989dd-d828-4f52-8c29-15e8152cc4c8
+begin
+pluto_classes = select(pluto, [:bbl, :zone]);
+pluto_classes.bbl = string.(convert.(Int,pluto_classes.bbl))
+end;
+
 # ╔═╡ 66cd75cc-161c-4e85-8d40-ab01547443e1
 begin
 custom_quantiles = (0.05, 0.95)
 	
-electric_min, electric_max = quantile(dropmissing(nyc_monthly, :electricity_mwh).electricity_mwh, custom_quantiles)
-gas_min, gas_max = quantile(dropmissing(nyc_monthly, :naturalgas_mwh).naturalgas_mwh, custom_quantiles)
+electric_min, electric_max = quantile(
+	dropmissing(nyc_monthly, :electricity_mwh).electricity_mwh, 
+	custom_quantiles
+)
+
+gas_min, gas_max = quantile(
+	dropmissing(nyc_monthly, :naturalgas_mwh).naturalgas_mwh, 
+	custom_quantiles
+)
 end
+
+# ╔═╡ e91d9f46-264a-4346-93e9-f4ac7353841a
+minimum(dropmissing(nyc_monthly, :electricity_mwh).electricity_mwh)
 
 # ╔═╡ bea53833-7f47-4b4b-afc2-a0bcc9159926
 begin
-filter!( 
-	x -> ismissing(x.electricity_mwh) 
-	|| electric_max > x.electricity_mwh > electric_min, 
-	nyc_monthly
-)
-filter!( 
-	x -> ismissing(x.naturalgas_mwh) || gas_max > x.naturalgas_mwh > gas_min, nyc_monthly
-)
+# filter!( 
+# 	x -> ismissing(x.electricity_mwh) 
+# 	|| electric_max > x.electricity_mwh > electric_min, 
+# 	nyc_monthly
+# )
+# filter!( 
+# 	x -> ismissing(x.naturalgas_mwh) || gas_max > x.naturalgas_mwh > gas_min, nyc_monthly
+# )
 end;
 
 # ╔═╡ ccf8cb9f-88a4-4f41-a635-d02dc479e50d
@@ -390,6 +434,9 @@ property_ids_data = select(unique(nyc_monthly, "Property Id"), "Property Id");
 # ╔═╡ e54c18df-46fe-4425-bdfc-ca8c529d436a
 md"""(4) *Cleaned nyc building centroids*"""
 
+# ╔═╡ 358b5b63-ff3d-463c-922e-5e1a83a12e57
+linking_data
+
 # ╔═╡ 009bc1d3-6909-4edf-a615-2b1c7bdb1ce8
 begin
 	nyc_building_points_ids = leftjoin(
@@ -402,10 +449,6 @@ begin
 		nyc_building_points_ids,
 		"Property Id"
 	)
-	select!(
-		nyc_building_points_ids,
-		Not(:bbl)
-	)
 	
 	@info "Buildings with valid linking term:" nrow(nyc_building_points_ids)
 
@@ -414,6 +457,9 @@ begin
 		property_ids_data,
 		on="Property Id"
 	)
+
+	# building_data = deepcopy(nyc_building_points_data)
+	# select!(nyc_building_points_data, Not(:bbl))
 
 	@info "Unfiltered Buildings with valid property id:" nrow(nyc_building_points_data)
 
@@ -426,6 +472,15 @@ begin
 
 	# @info "building data and locations" select(nyc_building_points_data, Not(:geometry))
 end;
+
+# ╔═╡ cb36bc07-e0e3-47a2-9434-1dc0269efdab
+
+
+# ╔═╡ 7989deca-dd42-4a1e-8f73-5ff8382c182a
+names(nyc_building_points_data)
+
+# ╔═╡ e6850ced-b321-450f-b247-50712b7e1612
+names(pluto_classes)
 
 # ╔═╡ a7e02d02-158f-44d5-8d2e-28d5aba1cca5
 
@@ -548,7 +603,7 @@ nyc_building_points_data
 # Plots.histogram(nyc_council_building_density, bins=20)
 
 # ╔═╡ fa11a171-904f-424b-bb42-25f664fe13e6
-rng = MersenneTwister(100)
+rng = MersenneTwister(120)
 
 # ╔═╡ eb4e2971-8fa4-4d6a-a175-6554c3122a41
 # candidate_councils = rand(1:nrow(nyc_council_counts),6)
@@ -569,7 +624,7 @@ nyc_council_building_density = nyc_council_counts.building_count ./ parse.(Float
 candidate_councils = sample(
 	rng,
 	nyc_council_counts.coun_dist,
-	6,
+	10,
 	replace=false
 )
 
@@ -633,9 +688,20 @@ end
 
 # ╔═╡ 0bfc6dec-97dd-4a7c-8af5-382068cddbc7
 begin
-	train_regions = filter(row -> row.coun_dist ∉ candidate_councils, nyc_council_counts)
-	validate_regions = filter(row -> row.coun_dist ∈ validation_districts, nyc_council_counts)
-	test_regions = filter(row -> row.coun_dist ∈ test_districts, nyc_council_counts)
+	train_regions = filter(
+		row -> row.coun_dist ∉ candidate_councils, 
+		nyc_council_counts
+	)
+	
+	validate_regions = filter(
+		row -> row.coun_dist ∈ validation_districts, 
+		nyc_council_counts
+	)
+	
+	test_regions = filter(
+		row -> row.coun_dist ∈ test_districts, 
+		nyc_council_counts
+	)
 
 	datasplit_map = Plots.plot(
 		cascade_union(train_regions.geometry),
@@ -909,7 +975,7 @@ nyc_building_centroids = ArchGDAL.centroid.(nyc_building_points_data.geometry);
 
 # ╔═╡ c6e1f5ac-55a0-4175-b05b-236a2eb68561
 # want this in KM
-projection_dist = 45e3
+projection_dist = 35e3
 
 # ╔═╡ 5c352c0c-0775-446d-b785-e7d9d2677c41
 # like to keep these together as reproject changes the original dataframe
@@ -1121,6 +1187,56 @@ begin
 	))
 end
 
+# ╔═╡ fe78bb01-6f8e-417b-949d-f241d5c210b4
+nyc_building_points_data
+
+# ╔═╡ fbad486f-dc7e-4b27-bfc0-5637a7c6ee15
+property_distance = select(nyc_building_points_data, [:bbl,:weather_station_distance]);
+
+# ╔═╡ 7911eff3-1cab-4b22-9411-dfc6edc4663e
+bbl_distances = Dict(Pair.(property_distance.bbl, property_distance.weather_station_distance))
+
+# ╔═╡ 12103a82-a2e0-44ab-8c28-8b49cd2dbacb
+bbl_distances["1009970029"]
+
+# ╔═╡ 3ebe6711-da2f-40fb-8984-cc8924c49380
+collect(keys(bbl_distances))[1:5]
+
+# ╔═╡ 03411b00-4548-4926-b117-a0f7333c8d06
+begin
+building_classes = dropmissing(leftjoin(
+	nyc_building_points_data,
+	pluto_classes,
+	on="bbl"
+));
+class_centroids = ArchGDAL.centroid.(building_classes.geometry);
+end
+
+# ╔═╡ a3fffddb-4359-4828-b0d7-cf36679cf508
+specific_building_classes = filter( 
+	x -> x.bbl ∈ keys(bbl_distances), 
+	building_classes
+);
+
+# ╔═╡ 8b178884-0898-4f23-8ad9-7d1b05f39f85
+specific_building_classes.weather_station_distance = map( 
+	x -> bbl_distances[x], 
+	specific_building_classes.bbl 
+);
+
+# ╔═╡ 1ada7932-9ea2-49a4-b7b1-068855f0a221
+# Gadfly.plot(
+# 	specific_building_classes,
+# 	x=:weather_station_distance,
+# 	color=:zone,
+# 	Geom.histogram(bincount=20),
+# 	Guide.xticks(ticks=0:0.25e4:2.5e4),
+# 	Guide.xlabel("Distance from Weather Station (m)"),
+# 	Guide.ylabel("Count of Buildings"),
+# 	Guide.title("Distance To Weather Station by Building Class"),
+# 	Theme(bar_spacing=0.3mm)
+# )
+
 # ╔═╡ 2f0caff4-5cf0-4c15-a143-9e8ef52a63f0
 weather_colorscheme = cgrad(:matter, length(unique_weatherstations), categorical=true)
 
@@ -1129,13 +1245,69 @@ begin
 	weather_colors = weather_colorscheme[map( x -> unique_weathermap[x], nyc_building_points_data.weather_station_id )]
 end
 
+# ╔═╡ 44d7ae4d-71c6-4cc9-9eff-c7e6834a9f28
+sample
+
+# ╔═╡ 4db21bd2-4245-43ce-85ef-3b2aabd3cc34
+sample(collect(1:length(nyc_building_centroids)), 10)
+
 # ╔═╡ 0cb33287-09da-47ff-9839-ed7d6b4da7e7
 begin
-	random_buildings_idx = sample(1:length(nyc_building_centroids), 500)
+	random_buildings_idx = sample(1:length(nyc_building_centroids), 2000)
 	random_buildings = nyc_building_centroids[random_buildings_idx]
 	random_colors = distance_colormap[random_buildings_idx]
 	random_weather_colors = weather_colors[random_buildings_idx]
 end;
+
+# ╔═╡ d8fb236f-66f6-489f-aa5b-37f2cf628d60
+class_colors = cgrad(:Hiroshige, 3, categorical=true)
+
+# ╔═╡ 3e31d432-7674-48f5-9d84-26c66b626684
+
+
+# ╔═╡ f75465ed-c8ad-4c93-bc08-50edec64d342
+building_class_colormap = Dict(
+	"Residential" => class_colors[1],
+	"Commercial" => class_colors[2],
+	"Manufacturing" => class_colors[3]
+);
+
+# ╔═╡ f2d782e3-961c-4060-aa99-d679a1badb1c
+building_class_colors = map( x -> building_class_colormap[x], building_classes.zone );
+
+# ╔═╡ 97c9eac5-2d15-4f13-b227-95f63467783b
+md"""
+#### Building Classes
+"""
+
+# ╔═╡ 72d51129-0c15-406b-ba84-b821a6000a02
+building_classes
+
+# ╔═╡ c39a50e8-c9bf-4f45-be9a-2118753ab9bf
+begin
+	sample_size = 6000
+	Plots.plot(
+		class_centroids[1:sample_size],
+		color_palette = building_class_colors[1:sample_size],
+		markersize=2,
+		markerstrokewidth=0,
+		dpi=500,
+		size=(700,500),
+	)
+	Plots.plot!(
+		nyc_council_counts.geometry,
+		color="transparent"
+	)
+	Plots.plot!(
+		epw_local.geometry,
+		color="white", 
+		markersize=8,
+		markerstrokewidth=2
+	)
+end
+
+# ╔═╡ 5cfef495-2d4f-4e50-a99a-e79e470fcba8
+Gadfly
 
 # ╔═╡ 805be959-76eb-4d96-aed4-b9344af198b0
 md"""
@@ -1163,6 +1335,9 @@ begin
 		markerstrokewidth=2
 	)
 end
+
+# ╔═╡ 74d54c2a-4434-4368-9cf8-1781453c0941
+
 
 # ╔═╡ 3c4e9f90-ebbb-40f9-a30a-c9d900af6bb7
 savefig(building_membership_plot, joinpath(output_dir, "building_station_membership.png"))
@@ -1220,7 +1395,7 @@ nyc_monthly_weathermap = leftjoin(
 end
 
 # ╔═╡ d993a9a6-107c-40f4-a9f7-2672df4d4e2e
-epw_average_dataframe = combine(groupby(epw_dataframe, [:month, :day, :weather_station_id]), names(epw_dataframe, Real) .=> mean, renamecols=false)
+epw_average_dataframe = combine(groupby(epw_dataframe, [:month, :day, :weather_station_id]), names(epw_dataframe, Real) .=> mean, renamecols=false);
 
 # ╔═╡ deac9195-7ffa-4fad-975b-89a05c3997b4
 md"""
@@ -1241,14 +1416,14 @@ custom_datedf = DataFrame(
 	date = desired_daterange,
 	month = Dates.month.(desired_daterange),
 	day = Dates.day.(desired_daterange)
-)
+);
 
 # ╔═╡ f4a4c3a9-8ce3-4b08-ab16-484ca96c5037
 epw_dataframe_expanded = select(leftjoin(
 	epw_average_dataframe,
 	custom_datedf,
 	on=["month", "day"]
-), Not(["month","day"]))
+), Not(["month","day"]));
 
 # ╔═╡ 76992d99-5910-4a63-be30-0f7005e74f67
 # so this is the goal of what I want to get
@@ -1262,7 +1437,7 @@ nyc_epw_data = select(dropmissing(leftjoin(
 	epw_dataframe_expanded,
 	unique_propertymap,
 	on="weather_station_id"
-), ["Property Id"]), ["Property Id","date"], Not("weather_station_id"))
+), ["Property Id"]), ["Property Id","date"], Not("weather_station_id"));
 
 # ╔═╡ d733f31c-b6c6-4a6d-8b80-c0ea2150b8b3
 # nyc_epw_data = select(leftjoin(
@@ -1319,7 +1494,7 @@ begin
 		joinpath(output_dir, "buildings_bbox.geojson"), 
 		nyc_buildings_simple
 	)
-end
+end;
 
 # ╔═╡ 2abcf02e-1939-43a2-b9db-d6b7aed79bcb
 md"""
@@ -1327,11 +1502,25 @@ Here is where the buildings get segmented away
 """
 
 # ╔═╡ c451dc76-cc1f-4ed6-992f-1dda55ab05c5
-nyc_data_stripped = select(nyc_building_points_data, Not(:geometry));
+nyc_data_stripped = select(building_classes, Not(:geometry));
+
+# ╔═╡ f816cdf1-5d34-4ed0-9b58-4ceb549025a3
+@info "NYC Data Colunmns" names(nyc_data_stripped)
+
+# ╔═╡ 434f3fe8-42ee-48b6-91ee-7a3612d260a0
+md"""
+At this point, I want to try and break 2018 and 2019 from 2020 to avoid temporal memorization of the data
+"""
+
+# ╔═╡ 718e160f-1547-4d62-957f-48b8450955d9
+names(nyc_building_points_data)
+
+# ╔═╡ dcd8738c-4492-405b-8b56-6514a443f395
+names(nyc_data_stripped)
 
 # ╔═╡ 09c9e54a-4045-4748-8e5f-4a8d96818fcf
 nyc_train_validate_buildings = filter(
-	row -> row.council_region ∉ candidate_councils, 
+	row -> row.council_region ∉ candidate_councils,
 	nyc_data_stripped
 );
 
@@ -1363,12 +1552,12 @@ test_buildings = filter(
 	row -> row.council_region ∈ test_districts, 
 	nyc_data_stripped
 )
+end;
 
-first(validation_buildings, 3)
-end
-
-# ╔═╡ d740b9b2-c261-4816-bfb1-1eb6c8b9a845
-first(nyc_building_points_data, 3)
+# ╔═╡ 8472b34e-ab85-4665-a215-cc97d59ab8b8
+md"""
+###### now if we just want to save the unique buildings, we can reference this file
+"""
 
 # ╔═╡ 0b1b09b5-d55c-48c1-a876-0783766476cf
 begin
@@ -1397,11 +1586,8 @@ for col in names(energy_terms)
    energy_terms[!,col] = Missings.coalesce.(energy_terms[:,col], 0)
 end
 
-# ╔═╡ 21eeb33a-5892-46b7-b1cb-9c19b5d58856
-# nyc_monthly_clean.energy_mwh = energy_terms.electricity_mwh .+ energy_terms.naturalgas_mwh;
-
-# ╔═╡ 34c7f174-eb11-4cae-8741-879efe9f36c0
-nyc_monthly_clean
+# ╔═╡ 4f12e14b-eabb-48db-9ee5-738f22f643c4
+breakpoint_date = DateTime(2020, 01, 01)
 
 # ╔═╡ 55921f40-4103-4606-98cf-287ca8fb9a19
 begin
@@ -1409,20 +1595,93 @@ begin
 		leftjoin(training_buildings, nyc_monthly_clean, on="Property Id"),
 		"Property Id", "date", :)
 	dropmissing!(nyc_train, :date)
+	filter!( row -> row.date < breakpoint_date, nyc_train )
 	
 	nyc_validate = select(
 		leftjoin(validation_buildings, nyc_monthly_clean, on="Property Id"),
 		"Property Id", "date", :)
 	dropmissing!(nyc_validate, :date)
+	filter!( row -> row.date < breakpoint_date, nyc_validate )
 	
 	nyc_test = select(
 		leftjoin(test_buildings, nyc_monthly_clean, on="Property Id"),
 		"Property Id", "date", :)
 	dropmissing!(nyc_test, :date)
+	filter!( row -> row.date >= breakpoint_date, nyc_test )
 end;
 
 # ╔═╡ b520c694-b9f3-4fa5-9ce8-3f0c04e221e4
-nyc_monthly_clean
+all_data = vcat(nyc_train, nyc_validate, nyc_test);
+
+# ╔═╡ fc9f0c15-1475-43a9-a0d6-3fa4b306bf43
+begin
+all_data.distancegroup = all_data.weather_station_distance .- (all_data.weather_station_distance .% 500)
+	
+building_class_energy = combine(
+	groupby(all_data, [:bbl,:zone,:distancegroup]),
+	:weather_station_distance => mean,
+	:electricity_mwh => sum,
+	:naturalgas_mwh => sum,
+	renamecols=false
+)
+
+group_energy = combine(groupby(
+	building_class_energy,
+	[:zone,:distancegroup]
+), [:electricity_mwh, :naturalgas_mwh] .=> (sum∘skipmissing), renamecols=false)
+
+rename!(group_energy, Dict(
+	"electricity_mwh" => "Electricity",
+	"naturalgas_mwh" => "Natural Gas"
+))
+end;
+
+# ╔═╡ f30fb312-8b39-4960-9118-63af8a7f60c9
+
+
+# ╔═╡ b274f0f8-6939-4b3d-ad0a-d0bb1129b5e0
+group_energyᵤ = stack(group_energy, ["Electricity", "Natural Gas"], variable_name="Energy Type");
+
+# ╔═╡ 5e780108-9199-408a-82f1-9e6887acaaf0
+building_energy_plot = Gadfly.plot(
+	group_energyᵤ,
+	x=:distancegroup,
+	y=:value,
+	ygroup="Energy Type",
+	color=:zone,
+	Geom.subplot_grid(
+		# Geom.point,
+		Geom.smooth(smoothing=0.2), 
+		free_x_axis = false,
+		Guide.yticks(ticks=collect(0:250:1250)),
+		Guide.xticks(ticks=collect(0:1e4:2.5e4)),
+	),
+	Guide.title("Energy Use by Type - Distance to Weather Station"),
+	Guide.xlabel("Distance from Weather Station (m)"),
+	Guide.ylabel("Enery Use (MWh)"),
+	Theme(point_size=1.6pt)
+)
+
+# ╔═╡ 3857f1e0-5039-47c6-9a17-b99e1e64b469
+draw(
+	PNG(
+		joinpath(output_dir, "building_class_energy.png"), 
+		14cm, 
+		12cm,
+		dpi=500
+	), building_energy_plot
+)
+
+# ╔═╡ 49c00b3b-1512-483c-a576-fa42078f997b
+
+
+# ╔═╡ 70099220-cf52-4865-82b1-6c3dd6cc08c0
+# Gadfly.plot(
+# 	building_class_energy,
+# 	x=:weather_station_distance,
+# 	color=:zone,
+# 	Geom.histogram(bincount=100)
+# )
 
 # ╔═╡ 022a9d72-68fb-4764-adbb-9cbe1a6ab44b
 # training percentage
@@ -1442,7 +1701,7 @@ md"""
 """
 
 # ╔═╡ 4c013c95-cf5f-4d59-b268-6a1aac7c42aa
-nyc_train
+sort(unique(nyc_test.date))
 
 # ╔═╡ ed6ed540-885a-41e1-9348-27826b74d194
 begin
@@ -1483,7 +1742,13 @@ end;
 # ╠═fa6b3c0c-8c48-4b99-85b9-e49b9f7993db
 # ╟─4197d920-ef37-4284-970a-7fd4331ad9b7
 # ╠═6fc43b1e-bdd6-44dd-9940-9d96e25a285d
+# ╠═9cb71b9a-872f-473f-97a6-a206770d98f9
+# ╠═c4599454-cb73-4caf-96eb-0bf3e6ab41b0
+# ╠═61a75e7b-a4f9-43a0-bdc9-115c2302edc5
+# ╠═ec4b943a-de32-4f03-916b-8765c1c08727
+# ╠═2b2989dd-d828-4f52-8c29-15e8152cc4c8
 # ╠═66cd75cc-161c-4e85-8d40-ab01547443e1
+# ╠═e91d9f46-264a-4346-93e9-f4ac7353841a
 # ╠═bea53833-7f47-4b4b-afc2-a0bcc9159926
 # ╠═ccf8cb9f-88a4-4f41-a635-d02dc479e50d
 # ╠═0f3a58c2-ae4b-4c89-9791-803cb89ab51e
@@ -1501,7 +1766,11 @@ end;
 # ╟─34db351a-d5cd-4069-add3-9aa3b4162585
 # ╠═6d6a3a4e-ac6f-41e5-8e8c-78f45eb4f618
 # ╟─e54c18df-46fe-4425-bdfc-ca8c529d436a
+# ╠═358b5b63-ff3d-463c-922e-5e1a83a12e57
 # ╠═009bc1d3-6909-4edf-a615-2b1c7bdb1ce8
+# ╠═cb36bc07-e0e3-47a2-9434-1dc0269efdab
+# ╠═7989deca-dd42-4a1e-8f73-5ff8382c182a
+# ╠═e6850ced-b321-450f-b247-50712b7e1612
 # ╟─a7e02d02-158f-44d5-8d2e-28d5aba1cca5
 # ╟─61c4ad16-99ef-4d21-a4dd-cae897e18659
 # ╟─68c9d819-d948-4bcf-a625-64f2bdc26b62
@@ -1610,11 +1879,31 @@ end;
 # ╠═6085ae4a-6874-4b38-91b3-5b4b60f3806f
 # ╠═64fefeee-7980-41c2-8a2f-2e539da260a4
 # ╠═2626b03d-e2e8-405e-84a4-ccb5d8432e5c
+# ╠═fe78bb01-6f8e-417b-949d-f241d5c210b4
+# ╠═fbad486f-dc7e-4b27-bfc0-5637a7c6ee15
+# ╠═7911eff3-1cab-4b22-9411-dfc6edc4663e
+# ╠═12103a82-a2e0-44ab-8c28-8b49cd2dbacb
+# ╠═3ebe6711-da2f-40fb-8984-cc8924c49380
+# ╠═03411b00-4548-4926-b117-a0f7333c8d06
+# ╠═a3fffddb-4359-4828-b0d7-cf36679cf508
+# ╠═8b178884-0898-4f23-8ad9-7d1b05f39f85
+# ╠═1ada7932-9ea2-49a4-b7b1-068855f0a221
 # ╠═2f0caff4-5cf0-4c15-a143-9e8ef52a63f0
 # ╠═c29ca84d-fa67-48c1-89c3-347b4ed2de24
+# ╠═44d7ae4d-71c6-4cc9-9eff-c7e6834a9f28
+# ╠═4db21bd2-4245-43ce-85ef-3b2aabd3cc34
 # ╠═0cb33287-09da-47ff-9839-ed7d6b4da7e7
+# ╠═d8fb236f-66f6-489f-aa5b-37f2cf628d60
+# ╠═3e31d432-7674-48f5-9d84-26c66b626684
+# ╠═f75465ed-c8ad-4c93-bc08-50edec64d342
+# ╠═f2d782e3-961c-4060-aa99-d679a1badb1c
+# ╟─97c9eac5-2d15-4f13-b227-95f63467783b
+# ╠═72d51129-0c15-406b-ba84-b821a6000a02
+# ╟─c39a50e8-c9bf-4f45-be9a-2118753ab9bf
+# ╠═5cfef495-2d4f-4e50-a99a-e79e470fcba8
 # ╟─805be959-76eb-4d96-aed4-b9344af198b0
-# ╠═efbb87f4-9ecb-411e-a380-61897a89f178
+# ╟─efbb87f4-9ecb-411e-a380-61897a89f178
+# ╠═74d54c2a-4434-4368-9cf8-1781453c0941
 # ╠═3c4e9f90-ebbb-40f9-a30a-c9d900af6bb7
 # ╟─bcf9c256-c6e7-45a2-b76d-12866bbb038b
 # ╠═9f5a9366-f35a-4639-a141-4341f7ac41f9
@@ -1642,21 +1931,31 @@ end;
 # ╠═656232a8-af8d-4086-b934-606005fd1359
 # ╠═6bb085a2-ab02-4103-9a64-1ada10c8726b
 # ╠═2abcf02e-1939-43a2-b9db-d6b7aed79bcb
+# ╠═f816cdf1-5d34-4ed0-9b58-4ceb549025a3
 # ╠═c451dc76-cc1f-4ed6-992f-1dda55ab05c5
+# ╟─434f3fe8-42ee-48b6-91ee-7a3612d260a0
+# ╠═718e160f-1547-4d62-957f-48b8450955d9
+# ╠═dcd8738c-4492-405b-8b56-6514a443f395
 # ╠═09c9e54a-4045-4748-8e5f-4a8d96818fcf
 # ╠═ae3313aa-0708-4bd5-84c9-d1f46af60688
 # ╠═6355aa82-05a5-4444-9b28-eea13ea76802
 # ╠═9cfc624e-2277-42f5-88e2-144ae23e178c
 # ╠═db856bad-d666-4972-ac42-af0a5be857ff
 # ╠═5445f923-6b7b-4ec2-9d6d-bff64a2d980e
-# ╠═d740b9b2-c261-4816-bfb1-1eb6c8b9a845
+# ╟─8472b34e-ab85-4665-a215-cc97d59ab8b8
 # ╠═0b1b09b5-d55c-48c1-a876-0783766476cf
 # ╠═a9a4a2a5-2495-4a1e-a551-fd573b0d557b
 # ╠═99947700-33b5-46fa-8d6a-b9689c6c7ee1
-# ╠═21eeb33a-5892-46b7-b1cb-9c19b5d58856
-# ╠═34c7f174-eb11-4cae-8741-879efe9f36c0
+# ╠═4f12e14b-eabb-48db-9ee5-738f22f643c4
 # ╠═55921f40-4103-4606-98cf-287ca8fb9a19
 # ╠═b520c694-b9f3-4fa5-9ce8-3f0c04e221e4
+# ╠═fc9f0c15-1475-43a9-a0d6-3fa4b306bf43
+# ╠═f30fb312-8b39-4960-9118-63af8a7f60c9
+# ╠═b274f0f8-6939-4b3d-ad0a-d0bb1129b5e0
+# ╠═5e780108-9199-408a-82f1-9e6887acaaf0
+# ╟─3857f1e0-5039-47c6-9a17-b99e1e64b469
+# ╠═49c00b3b-1512-483c-a576-fa42078f997b
+# ╠═70099220-cf52-4865-82b1-6c3dd6cc08c0
 # ╠═022a9d72-68fb-4764-adbb-9cbe1a6ab44b
 # ╠═d60c9e77-2a3e-4975-a38c-2102af2b8706
 # ╠═af43f162-0f5c-4c0e-ab8d-c6c2032af565
