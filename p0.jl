@@ -85,6 +85,9 @@ begin
 	tmy_path = mkpath(joinpath(data_base, "tmy-files"))
 	
 	unzip(tmy_zip_path, tmy_path)
+
+	pluto_zip_path = joinpath(data_base, "pluto-data.zip")
+	unzip(pluto_zip_path, data_base)
 end
 
 # ╔═╡ Cell order:
