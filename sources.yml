@@ -45,3 +45,8 @@ data-sources:
       download: "https://data.nrel.gov/system/files/156/BuildStock_TMY3_FIPS.zip"
       filetype: "zip"
       filesize: 750
+    pluto-data:
+      description: "https://s-media.nyc.gov/agencies/dcp/assets/files/pdf/data-tools/bytes/PLUTODD.pdf?v=22v3"
+      download: "https://s-media.nyc.gov/agencies/dcp/assets/files/zip/data-tools/bytes/nyc_pluto_22v3_csv.zip"
+      filetype: "zip"
+      filesize: 368
