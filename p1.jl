@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.16
+# v0.19.18
 
 using Markdown
 using InteractiveUtils
@@ -94,6 +94,9 @@ begin
 	@info "Target EPSG: " target
 end;
 
+# ╔═╡ 667ffd06-c015-461a-ad43-7aad027bedcb
+standard = ArchGDAL.importCRS(GeoFormatTypes.EPSG(4326))
+
 # ╔═╡ 4ce9f094-273d-4497-9255-202726b00c11
 md"""
 ## Chapter 1: New York City
@@ -174,9 +177,6 @@ energy_variables = names(annual_data)[Base.contains.(names(annual_data), "Use (k
 
 # ╔═╡ 27bb969d-c79f-4d8d-b780-e672b51138a8
 annual_energyterms = select(annual_data, energy_variables, "Electricity Use - Grid Purchase (kBtu)");
-
-# ╔═╡ 8ad4c349-d342-45de-9d44-dc2a40f73baf
-names(annual_energyterms)
 
 # ╔═╡ 059b124f-9a9d-4424-a92b-24853aa481af
 term_energy = map(eachcol(annual_energyterms)) do col
@@ -269,15 +269,40 @@ begin
 			"Natural Gas Use  (kBtu)" => "naturalgas_kbtu"
 		]
 	)
-	nyc_monthly[:,"electricity_mwh"] = nyc_monthly.electricity_kbtu ./ 3.412e+6
-	nyc_monthly[:,"naturalgas_mwh"] = nyc_monthly.naturalgas_kbtu ./ 3.412e+6
+	nyc_monthly[:,"electricity_mwh"] = nyc_monthly.electricity_kbtu .* 0.0002931
+	nyc_monthly[:,"naturalgas_mwh"] = nyc_monthly.naturalgas_kbtu .* 0.0002931
 end
 
-# ╔═╡ c4599454-cb73-4caf-96eb-0bf3e6ab41b0
+# ╔═╡ c233f8cf-2c61-43b7-ba09-4fe8f990a67e
+nyc_monthly_2020[1,"Electricity Use  (kBtu)"] / 3.412e+6
+
+# ╔═╡ 03f0aa0a-8fd2-4a4f-b7cb-6830797ccb9e
 class_mapping = Dict(
+	'A' => "Residential",
+	'B' => "Residential",
+	'C' => "Residential",
+	'D' => "Residential",
+	'E' => "Manufacturing",
+	'F' => "Manufacturing",
+	'G' => "Commercial",
+	'H' => "Commercial",
+	'I' => "Commercial",
+	'J' => "Commercial",
+	'K' => "Commercial",
+	'L' => "Commercial",
+	'M' => "Commercial",
+	'N' => "Residential",
+	'O' => "Commercial",
+	'P' => "Commercial",
+	'Q' => "Commercial",
 	'R' => "Residential",
-	'C' => "Commercial",
-	'M' => "Manufacturing"
+	'S' => "Residential",
+	'T' => "Commercial",
+	'U' => "Commercial",
+	'V' => "Commercial",
+	'W' => "Commercial",
+	'Y' => "Commercial",
+	'Z' => "Commercial",
 )
 
 # ╔═╡ 9cb71b9a-872f-473f-97a6-a206770d98f9
@@ -288,37 +313,35 @@ pluto = dropmissing(CSV.read(
 		"pluto_22v3.csv"
 	),
 	DataFrame
-), [:bbl,:zonedist1])
+), [:bbl,:bldgclass, :zipcode])
 
-dropmissing!(pluto, [:bbl,:zonedist1])
-filter!( x -> x.zonedist1[1] ∈ keys(class_mapping), pluto )
+pluto.zone = map( x -> class_mapping[x[1]], pluto.bldgclass )
+pluto
+# filter!( x -> x.bldgclass[1] ∈ keys(class_mapping), pluto )
 end
-
-# ╔═╡ 61a75e7b-a4f9-43a0-bdc9-115c2302edc5
-class_mapping['R']
-
-# ╔═╡ ec4b943a-de32-4f03-916b-8765c1c08727
-pluto.zone = map( x -> class_mapping[x[1]], pluto.zonedist1 )
 
 # ╔═╡ 2b2989dd-d828-4f52-8c29-15e8152cc4c8
 begin
-pluto_classes = select(pluto, [:bbl, :zone]);
+pluto_classes = select(pluto, [:bbl, :zone, :zipcode]);
 pluto_classes.bbl = string.(convert.(Int,pluto_classes.bbl))
 end;
 
 # ╔═╡ 66cd75cc-161c-4e85-8d40-ab01547443e1
 begin
-custom_quantiles = (0.05, 0.95)
+custom_quantiles = (0.02, 0.98)
 	
 electric_min, electric_max = quantile(
 	dropmissing(nyc_monthly, :electricity_mwh).electricity_mwh, 
 	custom_quantiles
 )
+@info "electric" electric_min, electric_max
 
 gas_min, gas_max = quantile(
 	dropmissing(nyc_monthly, :naturalgas_mwh).naturalgas_mwh, 
 	custom_quantiles
 )
+@info "gas" gas_min, gas_max
+
 end
 
 # ╔═╡ e91d9f46-264a-4346-93e9-f4ac7353841a
@@ -326,14 +349,14 @@ minimum(dropmissing(nyc_monthly, :electricity_mwh).electricity_mwh)
 
 # ╔═╡ bea53833-7f47-4b4b-afc2-a0bcc9159926
 begin
-# filter!( 
-# 	x -> ismissing(x.electricity_mwh) 
-# 	|| electric_max > x.electricity_mwh > electric_min, 
-# 	nyc_monthly
-# )
-# filter!( 
-# 	x -> ismissing(x.naturalgas_mwh) || gas_max > x.naturalgas_mwh > gas_min, nyc_monthly
-# )
+filter!( 
+	x -> ismissing(x.electricity_mwh) 
+	|| electric_max > x.electricity_mwh > electric_min, 
+	nyc_monthly
+)
+filter!( 
+	x -> ismissing(x.naturalgas_mwh) || gas_max > x.naturalgas_mwh > gas_min, nyc_monthly
+)
 end;
 
 # ╔═╡ ccf8cb9f-88a4-4f41-a635-d02dc479e50d
@@ -370,13 +393,15 @@ datacounts_plot = Plots.plot(
 	date_counts.Count,
 	ylims = (0,30000),
 	linestyle = :dash,
-	# color="black",
-	thickness_scaling=1.2,
-	linewidth = 2.5,
+	color="indianred",
+	thickness_scaling=1.3,
+	linewidth = 3,
 	legend=:bottomright,
 	ylabel="N Points - Monthly",
 	xlabel="Date",
-	title="Temporal Quality of Data"
+	title="Temporal Quality of Data",
+	right_margin = 10mm,
+	dpi=500
 )
 end
 
@@ -468,13 +493,10 @@ begin
 	@info "Cleaned Buildings with valid property id:" nrow(nyc_building_points_data)
 
 	unique!(nyc_building_points_data, ["Property Id"])
-	select(nyc_building_points_data, "Property Id", :)
+	# select(nyc_building_points_data, "Property Id", :)
 
 	# @info "building data and locations" select(nyc_building_points_data, Not(:geometry))
 end;
-
-# ╔═╡ cb36bc07-e0e3-47a2-9434-1dc0269efdab
-
 
 # ╔═╡ 7989deca-dd42-4a1e-8f73-5ff8382c182a
 names(nyc_building_points_data)
@@ -506,6 +528,9 @@ begin
 		dropmissing!(nyc_building_points_data);
 	end
 end
+
+# ╔═╡ 9382564d-6883-4a27-aa0f-e16126c8ed73
+nyc_building_points_data
 
 # ╔═╡ 2dea8532-505a-4b0e-8b98-966a47808804
 begin
@@ -620,6 +645,9 @@ nyc_council_counts = dropmissing(leftjoin(nyc_boundaries, council_count_df, on="
 # ╔═╡ 98e5f297-585b-4d8c-96e3-59b4b7c52d1e
 nyc_council_building_density = nyc_council_counts.building_count ./ parse.(Float64, nyc_council_counts.shape_area)
 
+# ╔═╡ 65551937-a081-4f9e-a32f-2d5fc7d1c707
+nyc_council_counts
+
 # ╔═╡ 01a6eaca-1294-4487-a224-6c59c1de7899
 candidate_councils = sample(
 	rng,
@@ -634,14 +662,29 @@ color_translation = nyc_council_counts.building_count / maximum(nyc_council_coun
 # ╔═╡ 5f548a26-a95e-4bc7-9dad-7bdefa41611c
 council_colors = cgrad(:matter)[color_translation];
 
-# ╔═╡ 9c877f38-ecf8-4acd-9849-200fb01bce00
+# ╔═╡ 81556126-6a6a-4417-8bca-2328142938ad
+nyc_council_counts.building_count[:,:]'
+
+# ╔═╡ 1fa92ae8-1417-4826-8932-136adfd41450
+rand(1, nrow(nyc_council_counts)) * 10
+
+# ╔═╡ 15245036-927b-4739-a147-b3c67c55e7c1
 begin
 	council_building_distribution = Plots.plot(
 		nyc_council_counts.geometry,
-		color_palette=council_colors,
-		title="Distribution of Building Counts",
-		dpi=500
+		fill_z = nyc_council_counts.building_count[:,:]',
+		color=:matter,
+		markerstrokewidth=0,
+		markersize=0,
+		cbar=true,
+		dpi=1000,
+		size=(600,400),
+		title="Count of Buildings"
 	)
+	# Plots.plot!(
+	# 	nyc_council_counts.geometry,
+	# 	fill_z = nyc_council_counts.building_count,
+	# )
 end
 
 # ╔═╡ 353f0519-69a8-484d-829d-368140ccb545
@@ -707,8 +750,9 @@ begin
 		cascade_union(train_regions.geometry),
 		color=:transparent,
 		dpi=600,
-		label="Training / Validating",
-		legend=:topleft
+		label="Training",
+		legend=:topleft,
+		right_margin = 20mm
 	)
 	Plots.plot!(
 		cascade_union(test_regions.geometry),
@@ -1004,6 +1048,9 @@ Finally we can filter for the stations which provide local weather data
 # ╔═╡ 643e0bbb-89e5-45a5-bcca-991cfc66e85d
 epw_local = filter( row -> ArchGDAL.contains(weather_region, row.geometry), epw_geo );
 
+# ╔═╡ d66a0ade-068b-40c9-a4ee-505f712a024d
+epw_local
+
 # ╔═╡ 1b7432eb-bc8d-4bd1-a19c-06ca71c29786
 begin
 	weather_stations_map = Plots.plot(
@@ -1062,8 +1109,17 @@ end
 epw_dataframe = vcat(epw_dataframelist...)
 epw_dataframe.month = month.(epw_dataframe.Date)
 epw_dataframe.day = day.(epw_dataframe.Date)
+epw_dataframe.hour = hour.(epw_dataframe.Date)
+
 select!(epw_dataframe, Not(:Date))
 end
+
+# ╔═╡ b6aeff48-f0ce-41fc-8ed7-0552a357bf46
+epw_μ = combine(groupby(
+	filter( x -> x.hour == 15, epw_dataframe), [:weather_station_id, :month, :day]), names(epw_dataframe, Real) .=> median, renamecols=false)
+
+# ╔═╡ 8bd319fc-d76a-4527-b607-944870096343
+epw_M = combine(groupby(filter( x -> x.hour == 15, epw_dataframe), [:weather_station_id, :month, :day]), names(epw_dataframe, Real) .=> maximum, renamecols=false)
 
 # ╔═╡ e6c80d02-1841-4598-bb38-bdb7a06e11ab
 md"""
@@ -1137,10 +1193,10 @@ minimum(min_distances)
 # ╔═╡ de137895-c4f4-4233-a4f2-935be5177d85
 building_weatherstation_histogram = Plots.histogram(
 	min_distances, 
-	color="transparent", 
+	color="darkgrey", 
 	linewidth=1.2,
 	dpi=600,
-	bins=20, 
+	bins=25, 
 	title="Distance to Nearest Weather Station",
 	xlabel="Distance - meters"
 )
@@ -1178,6 +1234,9 @@ distance_colormap = distance_colors[standardize(
 	nyc_building_points_data.weather_station_distance
 )]
 
+# ╔═╡ f68b4e41-1f0e-41ab-9147-49bf715549cd
+nyc_building_points_data.weather_station_distance
+
 # ╔═╡ 2626b03d-e2e8-405e-84a4-ccb5d8432e5c
 begin
 	unique_weatherstations = unique(nyc_building_points_data.weather_station_id)
@@ -1211,6 +1270,9 @@ building_classes = dropmissing(leftjoin(
 ));
 class_centroids = ArchGDAL.centroid.(building_classes.geometry);
 end
+
+# ╔═╡ 9a3c7a5a-0de2-426c-97c6-df4df0b21818
+building_classes
 
 # ╔═╡ a3fffddb-4359-4828-b0d7-cf36679cf508
 specific_building_classes = filter( 
@@ -1255,9 +1317,13 @@ sample(collect(1:length(nyc_building_centroids)), 10)
 begin
 	random_buildings_idx = sample(1:length(nyc_building_centroids), 2000)
 	random_buildings = nyc_building_centroids[random_buildings_idx]
+	random_buildings_distances = nyc_building_points_data.weather_station_distance[random_buildings_idx]
 	random_colors = distance_colormap[random_buildings_idx]
 	random_weather_colors = weather_colors[random_buildings_idx]
 end;
+
+# ╔═╡ 89946d99-b32a-4fa8-833e-6767a458b5b8
+random_buildings_distances
 
 # ╔═╡ d8fb236f-66f6-489f-aa5b-37f2cf628d60
 class_colors = cgrad(:Hiroshige, 3, categorical=true)
@@ -1285,26 +1351,30 @@ building_classes
 
 # ╔═╡ c39a50e8-c9bf-4f45-be9a-2118753ab9bf
 begin
-	sample_size = 6000
-	Plots.plot(
-		class_centroids[1:sample_size],
-		color_palette = building_class_colors[1:sample_size],
-		markersize=2,
-		markerstrokewidth=0,
-		dpi=500,
-		size=(700,500),
-	)
-	Plots.plot!(
-		nyc_council_counts.geometry,
-		color="transparent"
-	)
-	Plots.plot!(
-		epw_local.geometry,
-		color="white", 
-		markersize=8,
-		markerstrokewidth=2
-	)
+sample_size = 6000
+building_classes_plot = Plots.plot(
+	class_centroids[1:sample_size],
+	color_palette = building_class_colors[1:sample_size],
+	markersize=2,
+	markerstrokewidth=0,
+	dpi=1000,
+	size=(700,500),
+	title="Building Classes",
+)
+Plots.plot!(
+	nyc_council_counts.geometry,
+	color="transparent",
+)
+# Plots.plot!(
+# 	epw_local.geometry,
+# 	color="white", 
+# 	markersize=8,
+# 	markerstrokewidth=2
+# )
 end
+
+# ╔═╡ 7991f182-b0bc-496f-a00e-c38dacc3ed8d
+savefig(building_classes_plot, joinpath(output_dir, "building_classes_plot.png"))
 
 # ╔═╡ 5cfef495-2d4f-4e50-a99a-e79e470fcba8
 Gadfly
@@ -1347,30 +1417,11 @@ md"""
 ##### Or we could instead visualize the distances between the buildings and their closest weather station
 """
 
-# ╔═╡ 9f5a9366-f35a-4639-a141-4341f7ac41f9
-begin
-	building_distance_plot = Plots.plot(
-		random_buildings,
-		color_palette = random_colors,
-		markersize=3,
-		markerstrokewidth=0,
-		dpi=500,
-		size=(700,500)
-	)
-	Plots.plot!(
-		nyc_council_counts.geometry,
-		color="transparent"
-	)
-	Plots.plot!(
-		epw_local.geometry,
-		color="white", 
-		markersize=8,
-		markerstrokewidth=2
-	)
-end
+# ╔═╡ bb8bf6f3-5c0c-403a-8824-2a2e43f95e77
 
-# ╔═╡ aabde700-9b51-4933-96a2-5a6d37ccddab
-savefig(building_distance_plot, joinpath(output_dir, "building_distances.png")) # save the fig referenced by plot_ref as filename_string (such as "output.png")
+
+# ╔═╡ 3ac2edeb-d76f-4020-8957-f7fc3e59df68
+
 
 # ╔═╡ 8928439e-6d4b-4c65-8edb-0e329f86d4ec
 # now going to try and map the weather station indicator
@@ -1394,8 +1445,40 @@ nyc_monthly_weathermap = leftjoin(
 # select!(nyc_monthly_weathermap, ["Property Id", "weather_station_id", "month", "day"])
 end
 
+# ╔═╡ 2d70eacf-1793-4fe1-a58e-2f5425cceadc
+centralpark_epw = filter( x -> x.weather_station_id == 725033, epw_dataframe)
+
+# ╔═╡ ba1ab44d-80de-4ea3-9ba2-f4894fef6ade
+select(epw_dataframe, :weather_station_id, :month, :day, :hour, :)
+
 # ╔═╡ d993a9a6-107c-40f4-a9f7-2672df4d4e2e
-epw_average_dataframe = combine(groupby(epw_dataframe, [:month, :day, :weather_station_id]), names(epw_dataframe, Real) .=> mean, renamecols=false);
+begin
+epw_median_dataframe = combine(
+	groupby(filter( x -> x.hour == 15, epw_dataframe), [:month, :day, :weather_station_id]), 
+	names(epw_dataframe, Real) .=> median, 
+	renamecols=false
+);
+# epw_average_dataframe.date = Date.(Dates.Year(2018), Dates.Month.(epw_average_dataframe.month), Dates.Day.(epw_average_dataframe.day))
+# select!(epw_average_dataframe, :date, Not([:month, :day, :hour]))
+end;
+
+# ╔═╡ c9c86e93-0d3d-4b64-b5de-62ca93b90ebb
+begin
+epw_max_dataframe = combine(
+	groupby(filter( x -> x.hour == 15, epw_dataframe), [:month, :day, :weather_station_id]), 
+	names(epw_dataframe, Real) .=> maximum, 
+	renamecols=false
+);
+end;
+
+# ╔═╡ 667f9dea-a073-4a36-ab10-773ec5806af6
+begin
+epw_min_dataframe = combine(
+	groupby(filter( x -> x.hour == 15, epw_dataframe), [:month, :day, :weather_station_id]), 
+	names(epw_dataframe, Real) .=> minimum, 
+	renamecols=false
+);
+end;
 
 # ╔═╡ deac9195-7ffa-4fad-975b-89a05c3997b4
 md"""
@@ -1403,10 +1486,10 @@ one final complication - we want to duplicate the epw files for each year of the
 """
 
 # ╔═╡ 653f9d45-6845-4251-bdc9-27ca09ba73e5
-min_date = minimum(nyc_monthly_weathermap.date)
+min_date = Date.(minimum(nyc_monthly_weathermap.date))
 
 # ╔═╡ 5400d8d1-a8d9-47a1-b580-1b3eb2f3af48
-max_date = maximum(nyc_monthly_weathermap.date)
+max_date = Date.(maximum(nyc_monthly_weathermap.date))
 
 # ╔═╡ 8b1a9a22-1258-42da-a3ba-73def9c7d74f
 desired_daterange = collect(min_date:Dates.Day(1):max_date)
@@ -1418,12 +1501,37 @@ custom_datedf = DataFrame(
 	day = Dates.day.(desired_daterange)
 );
 
+# ╔═╡ 14ace21b-875b-4ff7-9cde-039a63c5412b
+
+
 # ╔═╡ f4a4c3a9-8ce3-4b08-ab16-484ca96c5037
-epw_dataframe_expanded = select(leftjoin(
-	epw_average_dataframe,
+epw_dataframe_expanded = dropmissing(select(leftjoin(
 	custom_datedf,
+	epw_median_dataframe,
 	on=["month", "day"]
-), Not(["month","day"]));
+), Not([:month, :day, :hour])), :weather_station_id);
+
+# ╔═╡ 9e63ec11-033e-40f0-bed8-7a3836a54b93
+epw_dataframe_expanded_M = dropmissing(select(leftjoin(
+	custom_datedf,
+	epw_max_dataframe,
+	on=["month", "day"]
+), Not([:month, :day, :hour])), :weather_station_id);
+
+# ╔═╡ 5c70f27e-5b69-4281-8cc4-eba8de49b994
+epw_dataframe_expanded_m = dropmissing(select(leftjoin(
+	custom_datedf,
+	epw_min_dataframe,
+	on=["month", "day"]
+), Not([:month, :day, :hour])), :weather_station_id);
+
+# ╔═╡ ad63499e-5735-481f-b559-bf70cd7e7d42
+epw_sampledata = innerjoin(
+	rename(select(epw_dataframe_expanded, [:date, :weather_station_id, Symbol("Drybulb Temperature (°C)")]), "Drybulb Temperature (°C)" => "median_temp"),
+	rename(select(epw_dataframe_expanded_M, [:date, :weather_station_id, Symbol("Drybulb Temperature (°C)")]), "Drybulb Temperature (°C)" => "max_temp"),
+	rename(select(epw_dataframe_expanded_m, [:date, :weather_station_id, Symbol("Drybulb Temperature (°C)")]), "Drybulb Temperature (°C)" => "min_temp"),
+	on=[:date,:weather_station_id]
+)
 
 # ╔═╡ 76992d99-5910-4a63-be30-0f7005e74f67
 # so this is the goal of what I want to get
@@ -1439,6 +1547,20 @@ nyc_epw_data = select(dropmissing(leftjoin(
 	on="weather_station_id"
 ), ["Property Id"]), ["Property Id","date"], Not("weather_station_id"));
 
+# ╔═╡ 91e020ec-cd02-44f4-b4f4-9a20f1e6f3cb
+nyc_epw_data_M = select(dropmissing(leftjoin(
+	epw_dataframe_expanded_M,
+	unique_propertymap,
+	on="weather_station_id"
+), ["Property Id"]), ["Property Id","date"], Not("weather_station_id"))
+
+# ╔═╡ cec2eae3-d95d-4eda-8220-a0c252a416f6
+nyc_epw_data_m = select(dropmissing(leftjoin(
+	epw_dataframe_expanded_m,
+	unique_propertymap,
+	on="weather_station_id"
+), ["Property Id"]), ["Property Id","date"], Not("weather_station_id"));
+
 # ╔═╡ d733f31c-b6c6-4a6d-8b80-c0ea2150b8b3
 # nyc_epw_data = select(leftjoin(
 # 	dropmissing(nyc_monthly_weathermap, ["weather_station_id"]),
@@ -1449,10 +1571,34 @@ nyc_epw_data = select(dropmissing(leftjoin(
 # ╔═╡ 9a7b7072-0b92-455d-978c-85bd6f8e052f
 # filter( x -> x["Property Id"] == 1416310, nyc_epw_data )
 
+# ╔═╡ cfb2df69-f197-4ce0-864d-eac690ceff0c
+nrow(nyc_epw_data) / 1e6
+
+# ╔═╡ 4cfa2b90-7258-47aa-81f9-a162e72df73d
+CSV.write(
+	joinpath(output_dir, "property_mapping.csv"),
+	unique_propertymap
+)
+
 # ╔═╡ 2386de40-02d1-4244-a2f5-9a290ff81858
 CSV.write(
 	joinpath(output_dir, "epw.csv"),
 	nyc_epw_data
+)
+
+# ╔═╡ 7b05d439-57bc-415a-a532-949527e63542
+nrow(nyc_epw_data_M) / 1e6
+
+# ╔═╡ 55881340-13e7-4e89-94f9-5c1822970d6c
+CSV.write(
+	joinpath(output_dir, "epw_sample.csv"),
+	epw_sampledata
+)
+
+# ╔═╡ 0ef56ae8-c20c-4327-8eac-f6e250515e04
+CSV.write(
+	joinpath(output_dir, "epw_min.csv"),
+	nyc_epw_data_m
 )
 
 # ╔═╡ 5379b543-b900-4ffb-a7b9-24107d2c74ef
@@ -1554,6 +1700,34 @@ test_buildings = filter(
 )
 end;
 
+# ╔═╡ a0c959f6-8ee5-4a4c-a42f-fa50ee045001
+nrow(training_buildings) + nrow(validation_buildings)
+
+# ╔═╡ d197d8ca-155b-44c9-b269-fd6bcd427e66
+nrow(test_buildings)
+
+# ╔═╡ eef3b810-b906-4b80-b76f-e9ff2327af7a
+test_buildings′ = dropmissing(leftjoin(
+	unique(test_buildings, "Property Id"),
+	unique(select(nyc_building_points_data, ["geometry", "Property Id"])),
+	on="Property Id"
+), :geometry);
+
+# ╔═╡ bade7450-2ee4-4182-ac2d-af2daf3dbfd9
+GeoDataFrames.write(
+	joinpath(output_dir, "test_buildings.geojson"), 
+	test_buildings′
+)
+
+# ╔═╡ 32791ca0-3f6d-4db3-be90-3a97d6b384ed
+test_buildings′.geometry[1]
+
+# ╔═╡ 3e628b9d-5c9f-44c9-99c3-d595ba15d648
+begin
+buildings = nyc_data_stripped
+CSV.write(joinpath(output_dir, "buildings.csv"), buildings)
+end
+
 # ╔═╡ 8472b34e-ab85-4665-a215-cc97d59ab8b8
 md"""
 ###### now if we just want to save the unique buildings, we can reference this file
@@ -1610,6 +1784,51 @@ begin
 	filter!( row -> row.date >= breakpoint_date, nyc_test )
 end;
 
+# ╔═╡ 00aec45d-2362-4801-8b40-46e7456fecc9
+begin
+nyc_data = select(
+	leftjoin(buildings, nyc_monthly_clean, on="Property Id"),
+	"Property Id", "date", :)
+dropmissing!(nyc_data, :date)
+# filter!( row -> row.date < breakpoint_date, nyc_train )
+end
+
+# ╔═╡ 241e4a90-4bdd-498c-9a24-abc07b2aa264
+ny_renamed = rename(nyc_data, 
+	:electricity_mwh => Symbol("Electricity (MWh)"),
+	:naturalgas_mwh => Symbol("Natural Gas (MWh)")
+)
+
+# ╔═╡ ecb0486a-8664-4d39-a22a-d60f30efea74
+consumption_statistics = Gadfly.plot(
+	filter( x -> x.value < 500 && x.value > 0, dropmissing(stack(
+		rename(nyc_data, 
+			:electricity_mwh => Symbol("Electricity (MWh)"),
+			:naturalgas_mwh => Symbol("Natural Gas (MWh)")
+		), [Symbol("Electricity (MWh)"), Symbol("Natural Gas (MWh)")]), :value)),
+	x=:value,
+	xgroup=:variable,
+	# color=:variable,
+	Geom.subplot_grid(Geom.histogram(density=false, bincount=100)),
+	Theme(default_color="black"),
+	Guide.title("Monthly Building Energy Consumption Histogram"),
+	Guide.ylabel("Number of Instances")
+	# Geom.histogram2d(
+	# 	xbincount=50,
+	# 	ybincount=50
+	# )
+)
+
+# ╔═╡ dc45bcae-3799-4984-9aef-f5f9caa505a1
+draw(
+	PNG(
+		joinpath(output_dir, "consumption_trends.png"), 
+		17cm, 
+		12cm,
+		dpi=500
+	), consumption_statistics
+)
+
 # ╔═╡ b520c694-b9f3-4fa5-9ce8-3f0c04e221e4
 all_data = vcat(nyc_train, nyc_validate, nyc_test);
 
@@ -1654,7 +1873,7 @@ building_energy_plot = Gadfly.plot(
 		Geom.smooth(smoothing=0.2), 
 		free_x_axis = false,
 		Guide.yticks(ticks=collect(0:250:1250)),
-		Guide.xticks(ticks=collect(0:1e4:2.5e4)),
+		Guide.xticks(ticks=collect(0:7.5e3:2.5e4)),
 	),
 	Guide.title("Energy Use by Type - Distance to Weather Station"),
 	Guide.xlabel("Distance from Weather Station (m)"),
@@ -1666,7 +1885,7 @@ building_energy_plot = Gadfly.plot(
 draw(
 	PNG(
 		joinpath(output_dir, "building_class_energy.png"), 
-		14cm, 
+		17cm, 
 		12cm,
 		dpi=500
 	), building_energy_plot
@@ -1710,6 +1929,12 @@ begin
 	CSV.write(joinpath(output_dir, "test.csv"), nyc_test);
 end;
 
+# ╔═╡ 4d4e91f1-4344-415d-8b01-4b88695f59e3
+nyc_data
+
+# ╔═╡ c0133acd-e90f-4cc5-9a8c-9c10f4c97ed5
+CSV.write(joinpath(output_dir, "alldata.csv"), nyc_data);
+
 # ╔═╡ Cell order:
 # ╠═1ea68209-380d-4b2e-9239-bedf850b8243
 # ╠═7488a1a4-2b76-48f7-80bb-3b441631068a
@@ -1719,6 +1944,7 @@ end;
 # ╠═70bc6e0e-fecb-4506-a810-2777d67f73a9
 # ╟─2de15f2f-cfc8-4416-9cde-a5e63a3b7d95
 # ╠═7f162842-c24a-4fdf-866d-eb4df50e8d23
+# ╠═667ffd06-c015-461a-ad43-7aad027bedcb
 # ╟─4ce9f094-273d-4497-9255-202726b00c11
 # ╠═c704089f-5a31-403f-89a1-352e90991d72
 # ╠═f6ba219d-9c7c-4947-a3fd-5a32e26e89a8
@@ -1731,7 +1957,6 @@ end;
 # ╠═0fb0caa1-d988-4920-9f89-8c9431a22371
 # ╠═dc2196ab-a277-4083-a7b6-4bbe90df3c53
 # ╠═27bb969d-c79f-4d8d-b780-e672b51138a8
-# ╠═8ad4c349-d342-45de-9d44-dc2a40f73baf
 # ╠═059b124f-9a9d-4424-a92b-24853aa481af
 # ╠═01178082-f94d-4cce-a491-f71a5e46355d
 # ╠═a12127c9-3a2d-46db-b01d-b1887390d353
@@ -1742,10 +1967,9 @@ end;
 # ╠═fa6b3c0c-8c48-4b99-85b9-e49b9f7993db
 # ╟─4197d920-ef37-4284-970a-7fd4331ad9b7
 # ╠═6fc43b1e-bdd6-44dd-9940-9d96e25a285d
+# ╠═c233f8cf-2c61-43b7-ba09-4fe8f990a67e
+# ╟─03f0aa0a-8fd2-4a4f-b7cb-6830797ccb9e
 # ╠═9cb71b9a-872f-473f-97a6-a206770d98f9
-# ╠═c4599454-cb73-4caf-96eb-0bf3e6ab41b0
-# ╠═61a75e7b-a4f9-43a0-bdc9-115c2302edc5
-# ╠═ec4b943a-de32-4f03-916b-8765c1c08727
 # ╠═2b2989dd-d828-4f52-8c29-15e8152cc4c8
 # ╠═66cd75cc-161c-4e85-8d40-ab01547443e1
 # ╠═e91d9f46-264a-4346-93e9-f4ac7353841a
@@ -1763,17 +1987,17 @@ end;
 # ╟─5c1383bb-50ad-43d9-ac99-2e2b14d41f33
 # ╟─9a579e9d-8de1-4b82-9508-a378f08e2955
 # ╠═01df78ab-aafd-462c-b5a1-1561fb890acb
-# ╟─34db351a-d5cd-4069-add3-9aa3b4162585
+# ╠═34db351a-d5cd-4069-add3-9aa3b4162585
 # ╠═6d6a3a4e-ac6f-41e5-8e8c-78f45eb4f618
 # ╟─e54c18df-46fe-4425-bdfc-ca8c529d436a
 # ╠═358b5b63-ff3d-463c-922e-5e1a83a12e57
 # ╠═009bc1d3-6909-4edf-a615-2b1c7bdb1ce8
-# ╠═cb36bc07-e0e3-47a2-9434-1dc0269efdab
 # ╠═7989deca-dd42-4a1e-8f73-5ff8382c182a
 # ╠═e6850ced-b321-450f-b247-50712b7e1612
 # ╟─a7e02d02-158f-44d5-8d2e-28d5aba1cca5
 # ╟─61c4ad16-99ef-4d21-a4dd-cae897e18659
-# ╟─68c9d819-d948-4bcf-a625-64f2bdc26b62
+# ╠═68c9d819-d948-4bcf-a625-64f2bdc26b62
+# ╠═9382564d-6883-4a27-aa0f-e16126c8ed73
 # ╠═2dea8532-505a-4b0e-8b98-966a47808804
 # ╠═07aab43a-697f-4d6a-a8c4-4415116368a7
 # ╠═878e4be3-1a1a-4f73-8823-fb69fd756437
@@ -1788,13 +2012,17 @@ end;
 # ╠═98e5f297-585b-4d8c-96e3-59b4b7c52d1e
 # ╠═45334b27-e117-4e76-bf15-44271775743c
 # ╠═fa11a171-904f-424b-bb42-25f664fe13e6
+# ╠═65551937-a081-4f9e-a32f-2d5fc7d1c707
 # ╠═01a6eaca-1294-4487-a224-6c59c1de7899
 # ╠═eb4e2971-8fa4-4d6a-a175-6554c3122a41
 # ╠═35d7d6d9-34bb-430a-9c74-001b446c9d09
 # ╠═691a9409-ab03-4843-9743-5685c563af81
 # ╠═e7f3b286-fe7e-48ce-a01a-25e5e3743267
 # ╠═5f548a26-a95e-4bc7-9dad-7bdefa41611c
-# ╠═9c877f38-ecf8-4acd-9849-200fb01bce00
+# ╠═89946d99-b32a-4fa8-833e-6767a458b5b8
+# ╠═81556126-6a6a-4417-8bca-2328142938ad
+# ╠═1fa92ae8-1417-4826-8932-136adfd41450
+# ╠═15245036-927b-4739-a147-b3c67c55e7c1
 # ╠═353f0519-69a8-484d-829d-368140ccb545
 # ╠═2da9205e-4325-4bf0-943e-10f8d4dd2b86
 # ╠═734c7a3b-10d5-4627-ae4d-1f787509e838
@@ -1846,6 +2074,7 @@ end;
 # ╠═c6e1f5ac-55a0-4175-b05b-236a2eb68561
 # ╟─c7fcad00-fa50-4a3f-ab13-8ac392b7abe7
 # ╠═643e0bbb-89e5-45a5-bcca-991cfc66e85d
+# ╠═d66a0ade-068b-40c9-a4ee-505f712a024d
 # ╠═1b7432eb-bc8d-4bd1-a19c-06ca71c29786
 # ╠═e0abb89d-4e46-4771-8353-92f8e59dfbbc
 # ╟─dc40e244-bdda-482c-8a57-09c24d5b9358
@@ -1853,6 +2082,8 @@ end;
 # ╟─51381ab9-d91d-4142-ab6c-43140375fd03
 # ╠═0af09aca-8ea7-46c2-a262-795639c295fb
 # ╠═16275ca0-17ab-42e7-b242-a6a804cd8e4c
+# ╠═b6aeff48-f0ce-41fc-8ed7-0552a357bf46
+# ╠═8bd319fc-d76a-4527-b607-944870096343
 # ╟─e6c80d02-1841-4598-bb38-bdb7a06e11ab
 # ╠═f758a6da-9531-4d37-b22b-6902d2466b9b
 # ╠═a68eb98c-3991-452a-b4b8-9564a4890e6a
@@ -1878,6 +2109,7 @@ end;
 # ╠═9f1b44e9-5106-4747-bdbe-84dcda3d9717
 # ╠═6085ae4a-6874-4b38-91b3-5b4b60f3806f
 # ╠═64fefeee-7980-41c2-8a2f-2e539da260a4
+# ╠═f68b4e41-1f0e-41ab-9147-49bf715549cd
 # ╠═2626b03d-e2e8-405e-84a4-ccb5d8432e5c
 # ╠═fe78bb01-6f8e-417b-949d-f241d5c210b4
 # ╠═fbad486f-dc7e-4b27-bfc0-5637a7c6ee15
@@ -1885,6 +2117,7 @@ end;
 # ╠═12103a82-a2e0-44ab-8c28-8b49cd2dbacb
 # ╠═3ebe6711-da2f-40fb-8984-cc8924c49380
 # ╠═03411b00-4548-4926-b117-a0f7333c8d06
+# ╠═9a3c7a5a-0de2-426c-97c6-df4df0b21818
 # ╠═a3fffddb-4359-4828-b0d7-cf36679cf508
 # ╠═8b178884-0898-4f23-8ad9-7d1b05f39f85
 # ╠═1ada7932-9ea2-49a4-b7b1-068855f0a221
@@ -1899,32 +2132,48 @@ end;
 # ╠═f2d782e3-961c-4060-aa99-d679a1badb1c
 # ╟─97c9eac5-2d15-4f13-b227-95f63467783b
 # ╠═72d51129-0c15-406b-ba84-b821a6000a02
-# ╟─c39a50e8-c9bf-4f45-be9a-2118753ab9bf
+# ╠═c39a50e8-c9bf-4f45-be9a-2118753ab9bf
+# ╠═7991f182-b0bc-496f-a00e-c38dacc3ed8d
 # ╠═5cfef495-2d4f-4e50-a99a-e79e470fcba8
 # ╟─805be959-76eb-4d96-aed4-b9344af198b0
 # ╟─efbb87f4-9ecb-411e-a380-61897a89f178
 # ╠═74d54c2a-4434-4368-9cf8-1781453c0941
 # ╠═3c4e9f90-ebbb-40f9-a30a-c9d900af6bb7
 # ╟─bcf9c256-c6e7-45a2-b76d-12866bbb038b
-# ╠═9f5a9366-f35a-4639-a141-4341f7ac41f9
-# ╠═aabde700-9b51-4933-96a2-5a6d37ccddab
+# ╠═bb8bf6f3-5c0c-403a-8824-2a2e43f95e77
+# ╠═3ac2edeb-d76f-4020-8957-f7fc3e59df68
 # ╠═8928439e-6d4b-4c65-8edb-0e329f86d4ec
 # ╠═ff729c37-8b94-4f55-bacb-d2d5d017a8b8
 # ╠═d5319700-fc6b-42e9-bfcf-166e6d162da8
 # ╠═2252a358-a59b-41e6-b1ab-37054987585c
+# ╠═2d70eacf-1793-4fe1-a58e-2f5425cceadc
+# ╠═ba1ab44d-80de-4ea3-9ba2-f4894fef6ade
 # ╠═d993a9a6-107c-40f4-a9f7-2672df4d4e2e
+# ╠═c9c86e93-0d3d-4b64-b5de-62ca93b90ebb
+# ╠═667f9dea-a073-4a36-ab10-773ec5806af6
 # ╟─deac9195-7ffa-4fad-975b-89a05c3997b4
 # ╠═653f9d45-6845-4251-bdc9-27ca09ba73e5
 # ╠═5400d8d1-a8d9-47a1-b580-1b3eb2f3af48
 # ╠═8b1a9a22-1258-42da-a3ba-73def9c7d74f
 # ╠═cd34c405-7f39-45ca-87af-12c90e611ff0
+# ╠═14ace21b-875b-4ff7-9cde-039a63c5412b
 # ╠═f4a4c3a9-8ce3-4b08-ab16-484ca96c5037
+# ╠═9e63ec11-033e-40f0-bed8-7a3836a54b93
+# ╠═5c70f27e-5b69-4281-8cc4-eba8de49b994
+# ╠═ad63499e-5735-481f-b559-bf70cd7e7d42
 # ╠═76992d99-5910-4a63-be30-0f7005e74f67
 # ╠═ca9f2fa1-8611-4a08-809c-2247bb7cdd29
 # ╠═3f64f1cf-243c-4b56-9a5c-ccb741ee967b
+# ╠═91e020ec-cd02-44f4-b4f4-9a20f1e6f3cb
+# ╠═cec2eae3-d95d-4eda-8220-a0c252a416f6
 # ╠═d733f31c-b6c6-4a6d-8b80-c0ea2150b8b3
 # ╠═9a7b7072-0b92-455d-978c-85bd6f8e052f
+# ╠═cfb2df69-f197-4ce0-864d-eac690ceff0c
+# ╠═4cfa2b90-7258-47aa-81f9-a162e72df73d
 # ╠═2386de40-02d1-4244-a2f5-9a290ff81858
+# ╠═7b05d439-57bc-415a-a532-949527e63542
+# ╠═55881340-13e7-4e89-94f9-5c1822970d6c
+# ╠═0ef56ae8-c20c-4327-8eac-f6e250515e04
 # ╠═5379b543-b900-4ffb-a7b9-24107d2c74ef
 # ╠═9eaefae4-4b09-4738-9e6e-cccd9eefc512
 # ╠═ee1aaec5-0a92-4d34-a853-39346ae107a5
@@ -1942,18 +2191,28 @@ end;
 # ╠═9cfc624e-2277-42f5-88e2-144ae23e178c
 # ╠═db856bad-d666-4972-ac42-af0a5be857ff
 # ╠═5445f923-6b7b-4ec2-9d6d-bff64a2d980e
+# ╠═a0c959f6-8ee5-4a4c-a42f-fa50ee045001
+# ╠═d197d8ca-155b-44c9-b269-fd6bcd427e66
+# ╠═eef3b810-b906-4b80-b76f-e9ff2327af7a
+# ╠═bade7450-2ee4-4182-ac2d-af2daf3dbfd9
+# ╠═32791ca0-3f6d-4db3-be90-3a97d6b384ed
+# ╠═3e628b9d-5c9f-44c9-99c3-d595ba15d648
 # ╟─8472b34e-ab85-4665-a215-cc97d59ab8b8
 # ╠═0b1b09b5-d55c-48c1-a876-0783766476cf
 # ╠═a9a4a2a5-2495-4a1e-a551-fd573b0d557b
 # ╠═99947700-33b5-46fa-8d6a-b9689c6c7ee1
 # ╠═4f12e14b-eabb-48db-9ee5-738f22f643c4
 # ╠═55921f40-4103-4606-98cf-287ca8fb9a19
+# ╠═00aec45d-2362-4801-8b40-46e7456fecc9
+# ╠═241e4a90-4bdd-498c-9a24-abc07b2aa264
+# ╠═ecb0486a-8664-4d39-a22a-d60f30efea74
+# ╠═dc45bcae-3799-4984-9aef-f5f9caa505a1
 # ╠═b520c694-b9f3-4fa5-9ce8-3f0c04e221e4
 # ╠═fc9f0c15-1475-43a9-a0d6-3fa4b306bf43
 # ╠═f30fb312-8b39-4960-9118-63af8a7f60c9
 # ╠═b274f0f8-6939-4b3d-ad0a-d0bb1129b5e0
 # ╠═5e780108-9199-408a-82f1-9e6887acaaf0
-# ╟─3857f1e0-5039-47c6-9a17-b99e1e64b469
+# ╠═3857f1e0-5039-47c6-9a17-b99e1e64b469
 # ╠═49c00b3b-1512-483c-a576-fa42078f997b
 # ╠═70099220-cf52-4865-82b1-6c3dd6cc08c0
 # ╠═022a9d72-68fb-4764-adbb-9cbe1a6ab44b
@@ -1962,3 +2221,5 @@ end;
 # ╠═371ee554-2386-45b7-a09b-09b8772cb377
 # ╠═4c013c95-cf5f-4d59-b268-6a1aac7c42aa
 # ╠═ed6ed540-885a-41e1-9348-27826b74d194
+# ╠═4d4e91f1-4344-415d-8b01-4b88695f59e3
+# ╠═c0133acd-e90f-4cc5-9a8c-9c10f4c97ed5
