@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.16
+# v0.19.18
 
 using Markdown
 using InteractiveUtils
@@ -23,6 +23,12 @@ begin
 	using YAML
 end;
 
+# ╔═╡ d75e2748-fa12-45f2-a380-e53ba1826893
+using ColorSchemes
+
+# ╔═╡ 3bf1db0d-fb5e-4212-8dac-5e9c009ad77f
+using Plots
+
 # ╔═╡ aeb3597f-ef6a-4d21-bff5-d2ad359bc1a2
 using Chain
 
@@ -35,6 +41,9 @@ using ArchGDAL
 # ╔═╡ 1c7bfba6-5e1d-457d-bd92-8ba445353e0b
 using MLJ
 
+# ╔═╡ 5bfda8cf-487b-4930-b212-9cd1622367de
+using Latexify
+
 # ╔═╡ a95245b0-afa8-443a-9a16-b01de7294f13
 using LinearAlgebra
 
@@ -43,12 +52,6 @@ using Random
 
 # ╔═╡ 97657a35-0407-4acc-b761-e6ebc06a3764
 using StatsBase
-
-# ╔═╡ 02e93f83-be74-4614-a0ff-2b1044198975
-using ColorSchemes
-
-# ╔═╡ 89b9cce5-b297-48c9-a4b6-3a7b43952294
-using Plots
 
 # ╔═╡ 9b3790d3-8d5d-403c-8495-45def2c6f8ba
 md"""
@@ -687,6 +690,12 @@ ŷ = MLJ.predict(custom_machine, X)
 return ŷ
 end
 
+# ╔═╡ 055aaebf-84ea-49dc-8f15-85a0e2e48b49
+a = false
+
+# ╔═╡ 36cc54b3-1e48-4f9a-9b34-b3bac0394eb8
+!a
+
 # ╔═╡ b5f8ce76-008a-491d-9537-f1b8f4943880
 begin
 tₐ = clean(dropmissing(select(train, electricity_terms)))
@@ -985,28 +994,30 @@ Tree = @load RandomForestRegressor pkg=DecisionTree verbosity=0
 # ╔═╡ aeeab107-8e68-4d0f-a3e3-8b1e0c12e8e6
 Tree
 
+# ╔═╡ c5e5a5e3-e324-4c8b-8449-caccc87cf8b6
+CUDALibs()
+
 # ╔═╡ ea1a797c-da0a-4133-bde5-366607964754
-# m_tree = EvoTree(
-# 	rng=rng, 
-# 	max_depth=3,
-# 	lambda=0.1,
-# 	gamma=0.1,
-# 	nrounds=20, 
-# 	rowsample=0.9, 
-# 	colsample=0.9,
-# 	device="gpu"
-# )
+begin
+m_tree = EvoTree( 
+ 	max_depth=4,
+ 	lambda=0.2,
+ 	gamma=0.2,
+ 	nrounds=10,
+ 	rowsample=0.95, 
+ 	colsample=0.95,
+ 	device="gpu"
+ )
+m = EnsembleModel(model=m_tree, n=100, rng=rng)
+end
 
 # ╔═╡ e5f7e860-4802-42a1-822d-51fcc983dfae
-m_tree = Tree(
-	rng=rng,
-	max_depth=3,
-	n_trees=20,
-	sampling_fraction=0.85
-)
-
-# ╔═╡ 019f1c79-440c-42aa-9483-d64389876336
-m = EnsembleModel(model=m_tree, n=5)
+#m_tree = Tree(
+#	rng=rng,
+#	max_depth=3,
+#	n_trees=20,
+#	sampling_fraction=0.85
+#)
 
 # ╔═╡ 8edfe547-f860-418f-8c68-e8fe0c16162f
 md"""
@@ -1535,13 +1546,17 @@ common_terms = [
 # ╔═╡ ae507fc7-5a13-42ed-a477-79d0b11c2efb
 begin
 resultsₑ = vcat([ select(x, common_terms) for x in test_terms ]...);
-resultsₑ.diff = resultsₑ.prediction .- resultsₑ.recorded;
+resultsₑ.diff = abs.(resultsₑ.prediction .- resultsₑ.recorded);
 end;
+
+# ╔═╡ 51691a55-d79e-4f2f-a223-785a11e8162f
+resultsₑ
 
 # ╔═╡ 19ffec1f-43f7-49af-91be-2553d8998951
 begin
 resultsₑ_combined = combine(groupby(resultsₑ, ["month","model","zone"]), 
 	:diff => mean,
+	nrow,
 	renamecols=false
 )
 resultsₑ_combined.fuel = repeat(["Electricity"], nrow(resultsₑ_combined))
@@ -1652,22 +1667,28 @@ end
 # )
 # end
 
+# ╔═╡ e98994c4-78ab-4d08-a1a0-e8fb3f3e79a7
+md"""##### This gives a snapshot of the relative performance of the model with increasing distance from the weather station"""
+
 # ╔═╡ 11277ca6-3bbf-403f-8cfc-2aabf94069f7
 p₇ = Gadfly.plot(
 	test_termsₑ,
 	color=:model,
 	x=:weather_station_distance,
-	y=test_termsₑ.prediction .- test_termsₑ.recorded,
+	y=abs.(test_termsₑ.prediction .- test_termsₑ.recorded),
 	xgroup=:zone,
 	Guide.ylabel("Mean Absolute Error - Smoothed"),
 	Guide.xlabel("Distance from Weather Station (m)"),
 	Guide.title("Electricity - MAE vs Weather Station Distance"),
-	# Scale.y_log,
-	Geom.subplot_grid(
-		Geom.smooth(smoothing=0.7),
-		# Guide.yticks(ticks=-0.15:0.1:0.15),
-		# Coord.cartesian(ymin=-0.2, ymax=0.2),
-	),
+	Geom.smooth(smoothing=0.8),
+	Scale.y_log,
+	Coord.cartesian(ymin=-3.3, ymax=-2.95),
+	Guide.yticks(ticks=-3.3:0.05:-2.95),
+	# Geom.subplot_grid(
+	# 	Geom.smooth(smoothing=0.7),
+	# 	# Guide.yticks(ticks=-0.15:0.1:0.15),
+	# 	# Coord.cartesian(ymin=-0.2, ymax=0.2),
+	# ),
 )
 
 # ╔═╡ b0f7e467-684b-41dd-b046-ed378dded683
@@ -1678,11 +1699,10 @@ Gadfly.plot(
 	resₑ,
 	x=:weather_station_distance,
 	y=resₑ.prediction .- resₑ.recorded,
-	ygroup=:zone,
 	color=:model,
-	Geom.subplot_grid(Geom.smooth(smoothing=0.6)),
+	Geom.smooth(smoothing=0.6),
 	Guide.xlabel("Weather Station Distance (m)"),
-	Guide.title("Electricity Degredation with Distance")
+	Guide.title("Electricity Degredation with Distance - Residential")
 )
 
 # ╔═╡ 28d2660e-258d-4583-8224-c2b4190f4140
@@ -1723,9 +1743,6 @@ md"""
 md"""
 For this study, going to explore how SAR and CMIP might be used in collaboration
 """
-
-# ╔═╡ fa72b6f2-de9b-430c-9ab6-f799157f1570
-validate
 
 # ╔═╡ 778dc2a7-4e9b-4f97-b34d-6a7adc38abc2
 
@@ -1974,20 +1991,24 @@ test_termsᵧ = [teᵧ′₀,teᵧ′₂,teᵧ′₄,teᵧ′₅,teᵧ′₆,te�
 # ╔═╡ c15b52c1-5d06-4fea-8645-91f92bfa716b
 begin
 resultsᵧ = vcat([ select(x, common_terms) for x in test_termsᵧ ]...);
-resultsᵧ.diff = resultsᵧ.prediction .- resultsᵧ.recorded;
+resultsᵧ.diff = abs.(resultsᵧ.prediction .- resultsᵧ.recorded);
 end;
 
 # ╔═╡ 07c78fb1-bcf4-40fd-9209-d3220d014912
 begin
 resultsᵧ_combined = combine(groupby(resultsᵧ, ["month","model","zone"]), 
 	:diff => mean,
+	nrow,
 	renamecols=false
 )
 resultsᵧ_combined.fuel = repeat(["Natural Gas"], nrow(resultsᵧ_combined))
 end;
 
 # ╔═╡ 15b3535f-6776-409d-8e6a-457b4c6eba78
+resultsᵧ
 
+# ╔═╡ 0c61beac-7fdb-4f05-a04c-f2a042ba34b2
+combine(groupby(resultsᵧ, ["Property Id","model"]), :prediction => median)
 
 # ╔═╡ d96c7a96-0875-4ebd-a1ba-e40db8008aed
 
@@ -2028,26 +2049,219 @@ building_distancesᵧ = unique(select(teᵧ, ["Property Id", "weather_station_di
 # 	),
 # )
 
+# ╔═╡ 372df76a-fd5d-4b84-ad83-988af1e78cf7
+md"""
+##### And this plot gives intuition into the relative benefit of adding each dataset with distance for natural gas prediction
+"""
+
 # ╔═╡ 459dbe8b-08f7-4bde-ba6d-ee4d05d1836f
 pᵧ₁ = Gadfly.plot(
 	test_termsₑᵧ,
-	Gadfly.layer(
-		color=:model,
-		x=:weather_station_distance,
-		y=abs.(test_termsₑᵧ.prediction .- test_termsₑᵧ.recorded),
-		Geom.smooth(smoothing=0.9),
-	),
+	color=:model,
+	x=:weather_station_distance,
+	y=abs.(test_termsₑᵧ.prediction .- test_termsₑᵧ.recorded),
+	Geom.smooth(smoothing=0.9),
 	Guide.ylabel("Mean Absolute Error - Smoothed"),
 	Guide.xlabel("Distance from Weather Station (m)"),
 	Guide.title("Natural Gas - MAE vs Weather Station Distance"),
-	Scale.y_log
+	Scale.x_continuous(minvalue=0, maxvalue=2.5e4),
+	Scale.y_log,
+	Coord.Cartesian(xmin=0,xmax=2.5e4)
 )
+
+# ╔═╡ c05dd607-1ce4-4931-9e23-2a9dad7cc039
+
 
 # ╔═╡ ae386c52-ff6b-4493-96ff-6c14d1c46db8
 draw(PNG(joinpath(output_dir, "naturalgas-mae.png"), 14cm, 10cm, dpi=600), pᵧ₁)
 
 # ╔═╡ 94580726-88ed-4a69-a101-9c792e3ed44b
 
+
+# ╔═╡ a3a49ba6-7272-4739-b11d-f09692afa46f
+test_termsₑ.energy = repeat(["Electricity"],nrow(test_termsₑ));
+
+# ╔═╡ cb96e206-8779-4c02-abd2-74948e13f263
+test_termsₑᵧ.energy = repeat(["Natural Gas"],nrow(test_termsₑᵧ));
+
+# ╔═╡ daf769b3-bcd3-4476-bdfb-492a90cd1225
+distanceresults = vcat(test_termsₑ, select(test_termsₑᵧ, names(test_termsₑ)));
+
+# ╔═╡ 1ddf99ee-0dfa-4dc2-82e4-8e065e78c992
+begin
+l₁ = Gadfly.layer(train, x=:weather_station_distance, Geom.density)
+l₂ = Gadfly.layer(test, x=:weather_station_distance, Geom.density, Theme(default_color="indianred"))
+l₃ = Gadfly.plot(l₁, l₂, Scale.x_continuous(minvalue=0, maxvalue=2.5e4),
+	Coord.Cartesian(xmin=0,xmax=2.5e4)
+)
+end
+
+# ╔═╡ 979e8ca8-105c-4f84-a20b-e3bd729495b4
+vstack(pᵧ₁, l₃)
+
+# ╔═╡ 467a06fe-2360-442d-b8b6-bbcbb09681f8
+distanceresults.distance_bucket = distanceresults.weather_station_distance .- (distanceresults.weather_station_distance .% 1000);
+
+# ╔═╡ 5d7e9b7a-aa1b-4737-94e4-a5df1de8ecc6
+begin
+# dr_reduced = filter( x -> x.weather_station_distance < 2e4, distanceresults )
+dr_reduced = distanceresults
+dr_reduced.err = abs.(dr_reduced.prediction .- dr_reduced.recorded)
+end;
+
+# ╔═╡ 6cc61a93-1143-42a1-9b8d-9a3f506db3df
+typeof(Vector(ColorSchemes.okabe_ito[1:5]))
+
+# ╔═╡ 20cc6945-d767-41e1-8a6b-1d88084a9781
+unique(dr_reduced.model)
+
+# ╔═╡ 4acabffb-ed34-4847-9ce2-c30031392ecc
+palette
+
+# ╔═╡ a7ef8e5a-ce04-4a3c-8ef8-421990f176a3
+dr = Gadfly.plot(
+	dr_reduced,
+	color=:model,
+	x=:weather_station_distance,
+	y=:err,
+	ygroup=:energy,
+	Geom.subplot_grid(
+		Geom.smooth(smoothing=0.75),
+		Coord.cartesian(ymin=-3.5, ymax=-2.0),
+		free_y_axis=true,
+		Guide.xticks(ticks=collect(0:2.5e3:25e3), orientation=:vertical),
+	),
+	Guide.ylabel("log(MAE) - Smoothed"),
+	Guide.xlabel("Distance from Weather Station (m)"),
+	Guide.title("Weather Station Distance (m) vs MAE"),
+	Scale.y_log,
+	Scale.discrete_color_manual(palette(:tableau_superfishel_stone, 7)...),
+	Theme(plot_padding=[2mm])
+)
+
+# ╔═╡ 50fee719-874e-42f6-8375-b0bcb9689c3c
+dr_reduced
+
+# ╔═╡ faecba7d-a52c-4d8f-a4a5-14f3610cb827
+edata = filter(
+	x -> x.energy == "Natural Gas" && x.zone == "Residential", 
+	dr_reduced
+);
+
+# ╔═╡ 923da0d6-8333-4335-ad95-1fdc47cde9cb
+eplot = Gadfly.plot(
+	edata,
+	color=:model,
+	x=:weather_station_distance,
+	y=:err,
+	xgroup=:zone,
+	Geom.subplot_grid(
+		Geom.smooth(smoothing=0.9),
+		# Coord.cartesian(ymin=-3.15, ymax=-3.05),
+		free_y_axis=true,
+		# Guide.xticks(ticks=collect(0:2.5e3:25e3), orientation=:vertical),
+	),
+	Guide.ylabel("log(MAE) - Smoothed"),
+	Guide.xlabel("Distance from Weather Station (m)"),
+	Guide.title("Weather Station Distance (m) vs MAE - Commercial Electricity"),
+	Scale.y_log,
+	Scale.discrete_color_manual(palette(:tab10)...),
+	Theme(plot_padding=[2mm])
+)
+
+# ╔═╡ 8dec16f2-f672-4a37-b6c6-6d2e7fad9b7c
+draw(PNG(joinpath(output_dir, "model-distance-quality-electricity.png"), 
+	18cm,
+	15cm,
+	dpi=600), eplot)
+
+# ╔═╡ a52dae0c-ce46-4a24-b6fc-02fb5226dcda
+ℯ^-3.0
+
+# ╔═╡ ac0375e0-131d-49d8-900e-754fa167c13b
+clip
+
+# ╔═╡ 44a94b75-ea19-40a8-a863-e362c651c8a2
+dr_reduced[dr_reduced.err .> ℯ^-2.5, :]
+
+# ╔═╡ adbe4ee5-62e7-42c6-baab-e42a3c4af4cc
+gdata = filter(
+	x -> x.energy == "Natural Gas", 
+	dr_reduced
+);
+
+# ╔═╡ ab0f2a21-2ce6-4fa5-960b-325ef778304f
+gplot = Gadfly.plot(
+	gdata,
+	color=:model,
+	x=:weather_station_distance,
+	y=:err,
+	xgroup=:zone,
+	Geom.subplot_grid(
+		Geom.smooth(smoothing=0.9),
+		# Coord.cartesian(ymin=-3.0, ymax=-2.5),
+		free_y_axis=true,
+		# Guide.xticks(ticks=collect(0:2.5e3:25e3), orientation=:vertical),
+	),
+	Guide.ylabel("log(MAE) - Smoothed"),
+	Guide.xlabel("Distance from Weather Station (m)"),
+	Guide.title("Weather Station Distance (m) vs MAE - Natural Gas"),
+	Scale.y_log,
+	Scale.discrete_color_manual(palette(:tab10)...),
+	Theme(plot_padding=[2mm])
+)
+
+# ╔═╡ 81f70fa7-0240-4868-ac9a-73a119b4e831
+draw(PNG(joinpath(output_dir, "model-distance-quality-gas.png"), 
+	32cm,
+	15cm,
+	dpi=600), gplot)
+
+# ╔═╡ cf5ef024-edbb-4468-99af-06064358a8ab
+disbu = combine(groupby(distanceresults, [:distance_bucket, :model, :energy]), [:prediction, :recorded] .=> mean, :model => first, :energy => first, renamecols=false);
+
+# ╔═╡ d41e7488-5655-487c-ba31-19be428fff2b
+disbu_plot = Gadfly.plot(
+	disbu,
+	x=:distance_bucket,
+	y=:model,
+	color=disbu.prediction .- disbu.recorded,
+	ygroup=:energy,
+	Geom.subplot_grid(Geom.rectbin),
+	Guide.xlabel("Distance from Weather Station (m)"),
+	Guide.title("MAE w.r.t. Weather Station Distance"),
+	Guide.colorkey(title="MAE"),
+	Scale.ContinuousColorScale(
+		palette -> get(ColorSchemes.matter, palette),
+	),
+	Theme(bar_spacing=0.2pt)
+)
+
+# ╔═╡ b67fab52-d0e0-45b9-8eba-99b4bca34182
+draw(PNG(joinpath(output_dir, "model-distance-quality.png"), 
+	15cm,
+	12cm, 
+	dpi=600), disbu_plot)
+
+# ╔═╡ 62cdf00d-86c4-4ad3-bf64-dfbaa4d6c6e6
+disbu
+
+# ╔═╡ 67e2b019-47bd-4473-974d-b5fbfcc55f18
+disbu_condensed = combine(groupby(disbu, [:distance_bucket, :energy, :model]), [:prediction, :recorded] .=> mean, renamecols=false)
+
+# ╔═╡ 61e30268-26f3-4940-8e9d-b9d5c54f4da0
+Gadfly.plot(
+	disbu,
+	x=:distance_bucket,
+	y=disbu.prediction .- disbu.recorded,
+	# color=:model,	
+	ygroup=:energy,
+	Geom.subplot_grid(Geom.point, Geom.hair),
+	Theme(boxplot_spacing=2pt) 
+	# Scale.ContinuousColorScale(
+	# 	palette -> get(ColorSchemes.tab10, palette),
+	# ),
+)
 
 # ╔═╡ 6f78dd2a-c225-41c7-b6a9-5f0925f87d14
 md"""
@@ -2125,6 +2339,12 @@ seaonsal_predictionresults = Gadfly.plot(
 	Guide.colorkey(title="Δ(%)")
 )
 
+# ╔═╡ 148923dc-8802-4af2-9c4b-ec41ad842366
+sort(filter(x -> x.zone == "Residential" && x.fuel == "Electricity", seasonal_results_norm), :delta)
+
+# ╔═╡ be498601-d19d-43ab-8bbb-aed717728e63
+describe(seasonal_results_norm.nrow)
+
 # ╔═╡ 96dd4c14-6791-4c8c-80c1-8f0301e34b35
 sort(filter( 
 	x -> x.fuel == "Electricity" && x.zone == "Residential" && x.model == "SAR"
@@ -2132,7 +2352,7 @@ sort(filter(
 
 # ╔═╡ 4df27234-b5b1-4607-b955-c2710257ffd6
 draw(PNG(joinpath(output_dir, "seasonal-predictionresults.png"), 
-	20cm,
+	30cm,
 	15cm, 
 	dpi=600), seaonsal_predictionresults)
 
@@ -2147,6 +2367,26 @@ draw(
 )
 
 # ╔═╡ 9e2aef0c-0121-4652-ad40-62ad5e8d0a0e
+names(test)
+
+# ╔═╡ c5899e25-25b2-43ec-8e9a-3e7e9af8f50d
+testbuilding_information = unique(select(test, ["Property Id","council_region","zone","weather_station_distance"]));
+
+# ╔═╡ 4eb5ef29-57d2-42e8-8579-411964792f72
+function dropna(df)
+	filter(:cvstd => x -> !any(f -> f(x), (ismissing, isnothing, isnan)), df)
+end
+
+# ╔═╡ 08c44240-6481-4af1-8473-b9cf1d91ef3c
+errterm = ["cvrmse","nmbe","rmse"]
+
+# ╔═╡ e85de5cc-219b-4e1d-a16d-1e84d657b870
+names(teₐ′₀)
+
+# ╔═╡ 85375b75-1bff-4f4a-a093-4bb55e752c0f
+teₐ′₀
+
+# ╔═╡ 03ce5f2e-e11d-4a4a-95c4-37b1c931ec18
 
 
 # ╔═╡ 329d55b8-eb72-4a1e-a4e8-200fee0e0b9d
@@ -2230,427 +2470,61 @@ md"""
 Baseline Existing Scenario
 """
 
-# ╔═╡ f32949e9-d644-4cbc-aed6-74a5e0825664
-cmip19 = filter( row -> Dates.year(row.date) == 2020, cmip );
-
-# ╔═╡ b8764c1b-4fc7-4efc-b706-3daad124dfde
-cmip19
-
-# ╔═╡ b2d422e0-d2b4-4b60-8e79-a9b4754f7e27
-function build_cmip(cmipdata, minterm, maxterm)
-	c = rename(
-		select(
-			cmipdata, 
-			[
-				Symbol("Property Id"),
-				Symbol("date"),
-				minterm,
-				maxterm
-			]),
-		minterm => :tmin,
-		maxterm => :tmax
-	)
-
-	t = clean(dropmissing(innerjoin(
-		vcat(tₐ, teₐ),
-		[c, sar]...,
-		on=["Property Id", "date"]
-	)))
-	return c, t
-end
-
-# ╔═╡ 77d37af6-212e-4d8b-9e29-c4873d10ca78
-crows = ["prediction","recorded","date","model"]
-
-# ╔═╡ 08844605-1dd5-42f6-ac05-bcb57a1ff985
-cmip_19, t19 = build_cmip(
-	filter( row -> Dates.year(row.date) == 2019, cmip ),
-	:tasmin_mean_f₃,
-	:tasmax_mean_f₃
-);
-
-# ╔═╡ 38672535-b7ca-46e7-afc0-4d8aa2200c95
-c19 = select(cmip_evaluate(t19, mᵥ, "cmip19"), crows);
-
-# ╔═╡ 68d4b11c-2c00-4de1-9be8-099128ee0629
-function deviation(old_cmip, new_cmip)
-	new_cmip.deviation = 100 .* (new_cmip.prediction .- old_cmip.prediction) ./ old_cmip.prediction
-	return new_cmip
-end
-
-# ╔═╡ e8fbf241-8eda-4723-a6b3-f76a9fadc487
-cmip_30, t30 = build_cmip(
-	cmip30,
-	:tasmin_mean_f₃,
-	:tasmax_mean_f₃
-);
-
-# ╔═╡ fcc6904a-af26-44eb-9e03-2d6ba83bb111
-names(cmip30)
-
-# ╔═╡ 9a279e3b-a26d-4b16-bcee-4a712f81bdd6
-cmip_30ₗ, t30ₗ = build_cmip(
-	cmip30,
-	:tasmin_quartile25_f₃,
-	:tasmax_quartile25_f₃
-);
-
-# ╔═╡ ce8ce8f4-7e5e-4a07-b434-74933a48d112
-cmip_30ᵤ, t30ᵤ = build_cmip(
-	cmip30,
-	:tasmin_quartile75_f₃,
-	:tasmax_quartile75_f₃
-);
-
-# ╔═╡ c3825758-c3d3-4d2e-ac20-37acd7d3ff16
-c30 = deviation(c19, select(cmip_evaluate(t30, mᵥ, "2030"), crows));
-
-# ╔═╡ e2bcd8f3-75fc-4e02-9d4a-eba3a9d01b30
-c30ₗ = rename(
-	deviation(c19, select(cmip_evaluate(t30ₗ, mᵥ, "2030"), crows)),
-	"deviation" => "lower"
-);
-
-# ╔═╡ 06903f32-5069-42df-8ca3-4cac0011bd64
-c30ᵤ = rename(
-	deviation(c19, select(cmip_evaluate(t30ᵤ, mᵥ, "2030"), crows)),
-	"deviation" => "upper"
-);
-
-# ╔═╡ 35eb8005-c75b-462a-aa7b-b1322ca55664
-c30ₐ = innerjoin(
-	select(c30, ["date","model","deviation"]),
-	select(c30ₗ, ["date","model","lower"]),
-	select(c30ᵤ, ["date","model","upper"]),
-	on=["model","date"]
-)
-
-# ╔═╡ 99acd1ef-17ef-47ca-84c3-0c7956e1c27d
-cmip_40, t40 = build_cmip(
-	cmip40,
-	:tasmin_mean_f₃,
-	:tasmax_mean_f₃
-);
-
-# ╔═╡ 5617fff4-d3a6-4852-832e-fad36c8c1ec1
-c40 = deviation(c19, select(cmip_evaluate(t40, mᵥ, "2040"), crows));
-
-# ╔═╡ 9da17695-6f7a-4a37-90ef-34d6adedbd8c
-cmip_40ₗ, t40ₗ = build_cmip(
-	cmip40,
-	:tasmin_quartile25_f₃,
-	:tasmax_quartile25_f₃
-);
-
-# ╔═╡ 8baea97a-f9a3-43a3-be07-6f0ffda6e60a
-cmip_40ᵤ, t40ᵤ = build_cmip(
-	cmip40,
-	:tasmin_quartile75_f₃,
-	:tasmax_quartile75_f₃
-);
-
-# ╔═╡ 3b00cc15-14fd-471f-b48c-8db92496684e
-c40ₗ = rename(
-	deviation(c19, select(cmip_evaluate(t40ₗ, mᵥ, "2040"), crows)),
-	"deviation" => "lower"
-);
-
-# ╔═╡ 6c4d5d37-4cc8-4bc4-9842-d18c0ce7ec4f
-c40ᵤ = rename(
-	deviation(c19, select(cmip_evaluate(t40ᵤ, mᵥ, "2040"), crows)),
-	"deviation" => "upper"
-);
-
-# ╔═╡ 3612d185-8a7c-409f-952b-b17532a484dd
-c40ₐ = innerjoin(
-	select(c40, ["date","model","deviation"]),
-	select(c40ₗ, ["date","model","lower"]),
-	select(c40ᵤ, ["date","model","upper"]),
-	on=["model","date"]
-);
-
-# ╔═╡ 479e8b29-ab02-4075-9711-599ded8807b3
-
-
-# ╔═╡ bfaf76d3-562f-498b-a031-fa07f459c4b4
-cmip_50, t50 = build_cmip(
-	cmip50,
-	:tasmin_mean_f₃,
-	:tasmax_mean_f₃
-);
-
-# ╔═╡ cb292cfb-32c8-441f-ab7e-5cc908234d17
-c50 = deviation(c19, select(cmip_evaluate(t50, mᵥ, "2050"), crows));
-
-# ╔═╡ b2c52c2e-9972-4a52-9345-b4c768b76494
-cmip_50ₗ, t50ₗ = build_cmip(
-	cmip50,
-	:tasmin_quartile25_f₃,
-	:tasmax_quartile25_f₃
-);
-
-# ╔═╡ c1fbea75-d24f-4049-b9be-93d1d4f391c9
-cmip_50ᵤ, t50ᵤ = build_cmip(
-	cmip50,
-	:tasmin_quartile75_f₃,
-	:tasmax_quartile75_f₃
-);
-
-# ╔═╡ 4130dfc2-56bc-41ef-83e1-ad9a0f2ff1fe
-c50ₗ = rename(
-	deviation(c19, select(cmip_evaluate(t50ₗ, mᵥ, "2050"), crows)),
-	"deviation" => "lower"
-);
-
-# ╔═╡ 648a99e0-6ee6-4489-a5bb-be1fa853fb23
-c50ᵤ = rename(
-	deviation(c19, select(cmip_evaluate(t50ᵤ, mᵥ, "2050"), crows)),
-	"deviation" => "upper"
-);
-
-# ╔═╡ 300b043c-e73a-41ae-b041-707e5365f597
-c50ₐ = innerjoin(
-	select(c50, ["date","model","deviation"]),
-	select(c50ₗ, ["date","model","lower"]),
-	select(c50ᵤ, ["date","model","upper"]),
-	on=["model","date"]
-);
-
-# ╔═╡ 1ddfcf7e-2958-4f5c-b43e-6f8393b5bdbd
-
-
-# ╔═╡ b2cc7582-8878-4ac1-a12b-79117c0dad93
-cmip_60, t60 = build_cmip(
-	cmip60,
-	:tasmin_mean_f₃,
-	:tasmax_mean_f₃
-);
-
-# ╔═╡ 604d254b-3d86-48bb-a22f-5d56771afdb4
-c60 = deviation(c19, select(cmip_evaluate(t60, mᵥ, "2060"), crows));
-
-# ╔═╡ ad41ec1e-c21c-46aa-8da1-e5bbf6fedcb5
-cmip_60ₗ, t60ₗ = build_cmip(
-	cmip60,
-	:tasmin_quartile25_f₃,
-	:tasmax_quartile25_f₃
-);
-
-# ╔═╡ cde6098d-9ec2-47e1-ad7f-02b910caa196
-cmip_60ᵤ, t60ᵤ = build_cmip(
-	cmip60,
-	:tasmin_quartile75_f₃,
-	:tasmax_quartile75_f₃
-);
-
-# ╔═╡ c01746c5-391a-497c-b9d3-10ddd2b1f7f5
-c60ₗ = rename(
-	deviation(c19, select(cmip_evaluate(t60ₗ, mᵥ, "2060"), crows)),
-	"deviation" => "lower"
-);
-
-# ╔═╡ 261a1d4e-adbf-4fdc-b3cc-b7e3ab8a1974
-c60ᵤ = rename(
-	deviation(c19, select(cmip_evaluate(t60ᵤ, mᵥ, "2060"), crows)),
-	"deviation" => "upper"
-);
-
-# ╔═╡ 53571901-8805-4c9c-b222-274c6a4cfa4f
-c60ₐ = innerjoin(
-	select(c60, ["date","model","deviation"]),
-	select(c60ₗ, ["date","model","lower"]),
-	select(c60ᵤ, ["date","model","upper"]),
-	on=["model","date"]
-);
-
-# ╔═╡ 053a7bc6-bf65-48be-bca5-f0ff615abc40
-
-
-# ╔═╡ a5841fe0-3f2d-4c86-976c-69eff2fc04b5
-
-
-# ╔═╡ 0f0a2e2e-599d-45cd-b997-0fd7f77f68e1
-begin
-cmip_forecast = vcat(c30ₐ,c40ₐ,c50ₐ,c60ₐ)
-end
-
-# ╔═╡ e71a83ea-2035-488d-8639-9837e79d1c30
-begin
-cmip_forecast_β = combine(
-	groupby(cmip_forecast, ["date","model"]),
-	[:deviation,:lower,:upper] .=> median,
-	renamecols=false
-)
-cmip_forecast_β.month = Dates.month.(cmip_forecast_β.date)
-end;
-
-# ╔═╡ 861d9d1d-e542-4de2-a4df-8ce3771dad64
-Gadfly.Scale.DiscreteColorScale
-
-# ╔═╡ 32715449-730c-4201-9c61-96b68ba6635f
-typeof(palette(:matter, 5)[1])
-
-# ╔═╡ 5b29638f-47fd-4b3a-bc51-cd35bcecf88e
-theme_colors = palette(:viridis, 5)[2:5];
-
-# ╔═╡ c5575618-9027-484f-85c0-aa239f239dbe
-electricity_forecast = Gadfly.plot(
-	cmip_forecast_β,
-	x=:month,
-	y=:deviation,
-	ymin=:lower,
-	ymax=:upper,
-	color=:model,
-	Geom.point,
-	Geom.ribbon,
-	Guide.xticks(ticks=1:12),
-	# Guide.yticks(ticks=-4:2:10),
-	Guide.title("NYC Building Electricity Predictions under RCP60"),
-	Guide.xlabel("Month"),
-	Guide.ylabel("Mean Electricity Change (%) - MWh"),
-	Scale.color_discrete_manual(theme_colors...),
-	Theme(alphas=[0.5])
-)
-
-# ╔═╡ 95d01f67-5b46-46c9-9403-53070829571e
-draw(
-	PNG(
-		joinpath(output_dir, "electricity_forecast.png"), 
-		13cm, 
-		9cm,
-		dpi=500
-	), electricity_forecast
-)
-
-# ╔═╡ cb6a77d5-cfdf-4a04-bafc-c5051568ff1d
-
-
-# ╔═╡ 05346d5e-081e-4139-97cb-99283ba1342b
-c60
-
-# ╔═╡ 0409ff93-8ece-4cef-a44d-1c36ea4a9c5f
-t19
-
-# ╔═╡ ddb913c3-e62c-48f8-8b65-4b281bdd33ab
-begin
-dataₑ¹ = dropmissing(clean(innerjoin(
-	dataₑ,
-	[cmip19, sar]...,
-	on=joining_terms
-)));
-
-dataₑ¹.prediction = validation_pipeline(
-	select(dataₑ¹, exclusion_terms),
-	"electricity_mwh",
-	mᵪₛ
-)
-end
-
-# ╔═╡ f07cf5b3-acc0-40ef-b997-76e4d5313aec
-## now want to make custom dates for the SAR data for matching
-
-# ╔═╡ cc58368b-bbcc-4849-ad3f-bec12ad3e16f
-md"""
-Climate scenario 60
-"""
-
-# ╔═╡ f4a21906-1857-418c-ba74-1d7d4f11509b
-begin
-dataₑ⁶ = dropmissing(clean(innerjoin(
-	dataₑ,
-	[cmip60, sar]...,
-	on=joining_terms
-)));
-dataₑ⁶.prediction = validation_pipeline(
-	select(dataₑ⁶, exclusion_terms),
-	"electricity_mwh",
-	mᵪₛ
-)
-end
-
-# ╔═╡ bd742e20-2fe6-40f6-9d0e-9922a907e7d3
-agg_func = sum
-
-# ╔═╡ 38c6250b-1c74-4c6a-be38-7612bd2cd06b
-d¹ = combine(groupby(dataₑ¹, :month), :prediction => agg_func => :p₁);
-
-# ╔═╡ ed2dccce-905e-4503-8c70-5cecd9d80734
-d² = combine(groupby(dataₑ⁶, :month), :prediction => agg_func => :p₂);
-
-# ╔═╡ 83ed5fe5-5f0e-4b0e-9ac4-f82e06940726
-begin
-pₛ = leftjoin(d¹, d², on=:month, makeunique=true)
-pₛ.diff = 100 .* ( pₛ.p₂ .- pₛ.p₁ ) ./ abs.( pₛ.p₁ )
-end
-
-# ╔═╡ 7b7cf78f-efb0-44b7-ae43-b413b79eb9d2
-Gadfly.plot(
-	pₛ,
-	x=:month,
-	y=:diff,
-	# Guide.yticks(ticks=0.0:0.3:2.5),
-	Geom.point,
-	Geom.line
-)
-
-# ╔═╡ b810a51c-7372-40df-a613-4112b53e547b
-agg_term = :tasmax_mean_f₃
-
 # ╔═╡ 64b19240-6e2a-4bb9-b681-5d4fdcc98935
-begin
-tₚ¹ = select(select(dataₑ¹, names(cmip19)), Not("Property Id"));
-ʒ¹ = combine(groupby(tₚ¹, :date), names(tₚ¹, Union{Real, Missing}) .=> mean, renamecols=false);
-end;
+# begin
+# tₚ¹ = select(select(dataₑ¹, names(cmip19)), Not("Property Id"));
+# ʒ¹ = combine(groupby(tₚ¹, :date), names(tₚ¹, Union{Real, Missing}) .=> mean, renamecols=false);
+# end;
 
 # ╔═╡ fbdc69a6-7227-4df8-a9a9-eca836565a11
-tₚ⁶ = select(select(dataₑ⁶, names(cmip60)), Not("Property Id"));
+# tₚ⁶ = select(select(dataₑ⁶, names(cmip60)), Not("Property Id"));
 
 # ╔═╡ 92bd44dc-c382-4835-b6ed-351756703389
-ʒ⁶ = combine(groupby(tₚ⁶, :date), names(tₚ⁶, Union{Real, Missing}) .=> mean, renamecols=false);
+# ʒ⁶ = combine(groupby(tₚ⁶, :date), names(tₚ⁶, Union{Real, Missing}) .=> mean, renamecols=false);
 
 # ╔═╡ 95f04c20-6adb-4122-9d4a-ccda1663fc83
-Gadfly.plot(
-	Gadfly.layer(
-		ʒ¹,
-		x=:date,
-		y=:tasmin_mean_f₃,
-		ymin=:tasmin_quartile25_f₃,
-		ymax=:tasmin_quartile75_f₃,
-		Geom.point,
-		Geom.line,
-		Geom.errorbar
-	),
-	Gadfly.layer(
-		ʒ⁶,
-		x=:date,
-		y=:tasmin_mean_f₃,
-		ymin=:tasmin_quartile25_f₃,
-		ymax=:tasmin_quartile75_f₃,
-		Geom.point,
-		Geom.line,
-		Geom.errorbar,
-		Theme(default_color="indianred")
-	)
-)
+# Gadfly.plot(
+# 	Gadfly.layer(
+# 		ʒ¹,
+# 		x=:date,
+# 		y=:tasmin_mean_f₃,
+# 		ymin=:tasmin_quartile25_f₃,
+# 		ymax=:tasmin_quartile75_f₃,
+# 		Geom.point,
+# 		Geom.line,
+# 		Geom.errorbar
+# 	),
+# 	Gadfly.layer(
+# 		ʒ⁶,
+# 		x=:date,
+# 		y=:tasmin_mean_f₃,
+# 		ymin=:tasmin_quartile25_f₃,
+# 		ymax=:tasmin_quartile75_f₃,
+# 		Geom.point,
+# 		Geom.line,
+# 		Geom.errorbar,
+# 		Theme(default_color="indianred")
+# 	)
+# )
 
 # ╔═╡ b8c478a1-c908-423f-bb30-c54d0d5a2f8e
-begin
-t¹ = combine(groupby(dataₑ¹, :month), agg_term => mean => :t₁)
-t² = combine(groupby(dataₑ⁶, :month), agg_term => mean => :t₂)
+# begin
+# t¹ = combine(groupby(dataₑ¹, :month), agg_term => mean => :t₁)
+# t² = combine(groupby(dataₑ⁶, :month), agg_term => mean => :t₂)
 
-tₛ = leftjoin(t¹, t², on=:month, makeunique=true)
-tₛ.diff = 100 .* ( tₛ.t₂ .- tₛ.t₁ ) ./ abs.( tₛ.t₁ )
-end
+# tₛ = leftjoin(t¹, t², on=:month, makeunique=true)
+# tₛ.diff = 100 .* ( tₛ.t₂ .- tₛ.t₁ ) ./ abs.( tₛ.t₁ )
+# end
 
 # ╔═╡ 5591c99f-fccf-42cc-a8ce-db7a4b7ddf08
-Gadfly.plot(
-	tₛ,
-	x=:month,
-	y=:diff,
-	Geom.point,
-	Geom.line,
-	Theme(default_color="indianred")
-)
+# Gadfly.plot(
+# 	tₛ,
+# 	x=:month,
+# 	y=:diff,
+# 	Geom.point,
+# 	Geom.line,
+# 	Theme(default_color="indianred")
+# )
 
 # ╔═╡ 95ed19ae-63ba-46e4-ade7-56aa84faccda
 # m₈ = training_pipeline(
@@ -2976,21 +2850,35 @@ cvrmse(ŷ, y, p=1) = 100 * (sum((y.-ŷ).^2) / (length(y)-p))^0.5 / mean(y)
 cvstd(ŷ, y, p=1) = (100 * mean(y)) / ((sum( (y .- mean(y)).^2 )/(length(y)-1))^0.5)
 
 # ╔═╡ c331ec69-2b5c-4ba9-8a7d-7130a27c320f
-function test_suite(Ẋ::DataFrame, selectors = ["Property Id", "zone"], report_model = true)
-	# Ẋ = hcat(X, auxiliary)	
-	vᵧ = groupby(Ẋ, selectors)
-	results = combine(vᵧ) do vᵢ
-	(
-	cvrmse = cvrmse(vᵢ.prediction, vᵢ.recorded),
-	nmbe = nmbe(vᵢ.prediction, vᵢ.recorded),
-	cvstd = cvstd(vᵢ.prediction, vᵢ.recorded),
-	rmse = rmse(vᵢ.prediction, vᵢ.recorded),
-	)
+function test_suite(Ẋ::DataFrame, selectors = ["Property Id", "zone"], report_model = true, region_counts=false)
+	# Ẋ = hcat(X, auxiliary)
+	if !region_counts
+		vᵧ = groupby(Ẋ, selectors)
+		results = combine(vᵧ) do vᵢ
+		(
+		cvrmse = cvrmse(vᵢ.prediction, vᵢ.recorded),
+		nmbe = nmbe(vᵢ.prediction, vᵢ.recorded),
+		cvstd = cvstd(vᵢ.prediction, vᵢ.recorded),
+		rmse = rmse(vᵢ.prediction, vᵢ.recorded),
+		)
+		end
+	else
+		vᵧ = groupby(Ẋ, selectors)
+		results = combine(vᵧ) do vᵢ
+		(
+		cvrmse = cvrmse(vᵢ.prediction, vᵢ.recorded),
+		nmbe = nmbe(vᵢ.prediction, vᵢ.recorded),
+		cvstd = cvstd(vᵢ.prediction, vᵢ.recorded),
+		rmse = rmse(vᵢ.prediction, vᵢ.recorded),
+		count = mean(vᵢ.nrow)
+		)
+		end	
 	end
 
 	if report_model
 		results.model = repeat([Ẋ[1,"model"]], nrow(results))
 	end
+	
 	return results
 end
 
@@ -2999,6 +2887,9 @@ describe(test_suite(filter( x -> x.recorded > 0, teₐ′₀), ["Property Id"]))
 
 # ╔═╡ 92e7c0a0-19df-43e2-90db-4e050ba90c5d
 test_suiteₜₑ = vcat([ test_suite(x) for x in test_terms ]...);
+
+# ╔═╡ ec420749-2c5e-4b70-a476-ff8be50f6fca
+combine(groupby(test_suiteₜₑ, :model), [:cvrmse, :nmbe, :cvstd, :rmse] .=> mean)
 
 # ╔═╡ a0cd5e68-3bd0-4983-809e-ce7acd36a048
 modelresultsₑ = combine(
@@ -3011,7 +2902,7 @@ modelresultsₑ = combine(
 
 # ╔═╡ ecb078da-702d-46f7-846a-4759b3e0f172
 baselinesₑ = rename(
-	select(filter(x -> x.model == "EPW", modelresultsₑ), [:zone,:rmse]),
+	select(filter(x -> x.model == "Null", modelresultsₑ), [:zone,:rmse]),
 	:rmse => :baseline
 )
 
@@ -3047,15 +2938,12 @@ describe(test_suite(filter(
 # ╔═╡ 734ed2d0-4657-4361-9285-97605371af72
 test_suiteₜᵧ = vcat([ test_suite(x) for x in test_termsᵧ ]...);
 
-# ╔═╡ 42360e3a-afae-4fd0-a919-d9f1668865ce
-test_suiteₜᵧ
-
 # ╔═╡ d1eaa0ee-8c7d-4b1b-a3c6-030fffd320c4
-modelresultsᵧ = combine(groupby(clean(test_suiteₜᵧ), ["zone","model"]), [:rmse, :cvrmse,:nmbe,:cvstd] .=> mean, renamecols=false)
+modelresultsᵧ = combine(groupby(clean(test_suiteₜᵧ), ["zone","model"]), [:rmse, :cvrmse,:nmbe,:cvstd] .=> mean, renamecols=false);
 
 # ╔═╡ 31a814af-95f1-4d7f-ada0-8bf9df2aee10
 baselinesᵧ = rename(
-	select(filter(x -> x.model == "EPW", modelresultsᵧ), [:zone,:rmse]),
+	select(filter(x -> x.model == "Null", modelresultsᵧ), [:zone,:rmse]),
 	:rmse => :baseline
 )
 
@@ -3131,8 +3019,300 @@ test_suiteₜᵧđ = leftjoin(
 	on="Property Id"
 );
 
-# ╔═╡ 8df28d8b-443e-48a3-89e4-a5824d3d66c8
-stack(test_suiteₜᵧđ, 2:4)
+# ╔═╡ b90dcb6c-70fe-4b7f-b91a-15a8e78d8411
+begin
+resultsₑₔ = test_suite(resultsₑ, ["Property Id","model"], false, false);
+resultsₑₔ[:,"energy"] = repeat(["Electricity"], nrow(resultsₑₔ));
+filter!(x -> x.cvrmse ≠ Inf && x.cvstd ≠ Inf, resultsₑₔ)
+resultsₑₔ
+end
+
+# ╔═╡ e008e66b-40f1-474c-ad3b-f64e542c7499
+combine(groupby(resultsₑₔ, ["model","energy"]), [:cvrmse, :nmbe, :cvstd, :rmse] .=>   mean ∘ skipmissing, renamecols=false)
+
+# ╔═╡ 33a3ddb2-898e-4bec-bc45-3cd65e8ddbd0
+begin
+resultsᵧₔ = test_suite(filter(x -> x.recorded > 0., resultsᵧ), ["Property Id","model"], false, false);
+resultsᵧₔ[:,"energy"] = repeat(["Natural Gas"], nrow(resultsᵧₔ))
+filter!(x -> x.cvrmse ≠ Inf && x.cvstd ≠ Inf, resultsᵧₔ)
+resultsᵧₔ
+end;
+
+# ╔═╡ c66a453b-c9b6-427f-ac13-a392626955e1
+describe(vcat(resultsₑₔ, resultsᵧₔ))
+
+# ╔═╡ 9cbf5154-b634-44e5-8646-74468f8977f5
+begin
+resultsₒₒ = combine(
+	groupby(vcat(resultsₑₔ, resultsᵧₔ), [:model, :energy]),
+	[:cvrmse, :nmbe, :cvstd, :rmse] .=> mean,
+	renamecols=false
+)
+end
+
+# ╔═╡ f4d83c51-650f-4ed3-856b-f39f74fd6e0e
+latexify(resultsₒₒ, latex=false, fmt = FancyNumberFormatter(4), env=:table)
+
+# ╔═╡ 3e8fd197-59fd-4547-8437-45456dec8f8d
+names(test_suite(teₐ′₀, ["Property Id"]))
+
+# ╔═╡ aba25e76-c18f-44de-b57b-c3aa8f5be42d
+function aggregate_councilerr(df)
+	test_suite(combine(groupby(leftjoin(
+			df,
+			select(testbuilding_information, ["Property Id","council_region"]),
+			on="Property Id"
+	), ["council_region","date", "model"]),
+		[:prediction, :recorded] .=> sum,
+		nrow,
+		renamecols=false
+	), ["council_region"], true, true)
+end
+
+# ╔═╡ d9ac0584-db8f-497e-807f-9b207b0a6151
+councilₐ₀ = aggregate_councilerr(teₐ′₀);
+
+# ╔═╡ 5a4110cf-6700-4b82-bdcf-4c724e342d1c
+councilₐ₂ = aggregate_councilerr(teₐ′₂);
+
+# ╔═╡ f254e3f8-a5a3-4d83-b2d8-50552bcd2edf
+councilₐ₄ = aggregate_councilerr(teₐ′₄);
+
+# ╔═╡ 44e249fc-dea4-464b-b8a8-94ef304f5769
+councilₐ₅ = aggregate_councilerr(teₐ′₅);
+
+# ╔═╡ c5903324-c203-43d5-9f0c-b5c7ba03af07
+councilₐ₆ = aggregate_councilerr(teₐ′₆);
+
+# ╔═╡ 38d0794b-a374-4a18-94d3-ba0ff3d8bba0
+councilₐ₇ = aggregate_councilerr(teₐ′₇);
+
+# ╔═╡ b7dcfb1b-0f90-4fad-9e3d-032944a24eca
+begin
+council_results = vcat(
+	councilₐ₀, 
+	councilₐ₂,
+	councilₐ₄,
+	councilₐ₅,
+	councilₐ₆,
+	councilₐ₇
+);
+council_results.energy = repeat(["Electricity"], nrow(council_results))
+end;
+
+# ╔═╡ c1287f32-e270-47fc-8b18-38394380e76e
+council_results.council_region
+
+# ╔═╡ 14357463-a585-409b-bbe1-a02bfd086c61
+council_results
+
+# ╔═╡ 1732eaee-3259-4982-9dae-69eed1c8b56d
+cr₁ = combine(groupby(council_results, [:model]), errterm .=> mean, renamecols=false)
+
+# ╔═╡ a440743b-6595-4bfa-93a7-36784dc965a3
+latexify(cr₁, latex=true, fmt = FancyNumberFormatter(4), env=:table)
+
+# ╔═╡ 61186b87-03ed-4cbd-bbfb-cecb98ab9313
+Gadfly.plot(
+	stack(council_results, [:cvrmse, :nmbe, :cvstd, :rmse]),
+	x=:count,
+	y=:value,
+	# color=:model,
+	yintercept=[0],
+	ygroup=:variable,
+	Geom.subplot_grid(Geom.point,Geom.smooth,Geom.hline(color="pink"),free_y_axis=true),
+	Theme(default_color="black")
+)
+
+# ╔═╡ add11e32-0299-4d2b-8d12-6c7436f3b49d
+councilᵧ₀ = aggregate_councilerr(teᵧ′₀);
+
+# ╔═╡ cdd6fcc4-0e63-4e9d-ac8b-e8a366f83625
+councilᵧ₂ = aggregate_councilerr(teᵧ′₂);
+
+# ╔═╡ e4cfe664-c46b-4626-a6f3-42d87b98e868
+councilᵧ₄ = aggregate_councilerr(teᵧ′₄);
+
+# ╔═╡ 82d00718-cc23-42b6-9902-bb0032fde744
+councilᵧ₅ = aggregate_councilerr(teᵧ′₅);
+
+# ╔═╡ dbe1f66c-e9ab-4d29-8846-20031c93abf1
+councilᵧ₆ = aggregate_councilerr(teᵧ′₆);
+
+# ╔═╡ f2300c70-9eba-4711-a35b-cec5ae8340f5
+councilᵧ₇ = aggregate_councilerr(teᵧ′₇);
+
+# ╔═╡ c4716c23-2924-4751-a303-e688b71199ab
+begin
+council_resultsᵧ = vcat(
+	councilᵧ₀, 
+	councilᵧ₂,
+	councilᵧ₄,
+	councilᵧ₅,
+	councilᵧ₆,
+	councilᵧ₇
+);
+council_resultsᵧ.energy = repeat(["Natural Gas"], nrow(council_resultsᵧ))
+end;
+
+# ╔═╡ 64fde861-20a5-4cdf-ab7e-d1409018ffe2
+Gadfly.plot(
+	stack(council_resultsᵧ, [:cvrmse, :nmbe, :cvstd, :rmse]),
+	x=:count,
+	y=:value,
+	# color=:model,
+	yintercept=[0],
+	ygroup=:variable,
+	Geom.subplot_grid(Geom.point,Geom.smooth,Geom.hline(color="pink"),free_y_axis=true),
+	Theme(default_color="black")
+)
+
+# ╔═╡ 1938a66f-9f6e-4b5c-9f67-6ba5c99d8bd1
+aggregated_results = stack(vcat(council_results, council_resultsᵧ), [:cvrmse, :nmbe, :cvstd, :rmse]);
+
+# ╔═╡ b02061e3-e42a-4581-b085-96b02fb19b52
+filter( x -> x.model == "SAR", aggregated_results)
+
+# ╔═╡ d36a7409-2441-4e04-b704-c389b4e690d0
+agg_results = Gadfly.plot(
+	filter( x -> x.model == "EPW", aggregated_results),
+	x=:count,
+	y=:value,
+	# color=:model,
+	# color=:model,
+	yintercept=[0],
+	xgroup=:energy,
+	ygroup=:variable,
+	Guide.title("EPW Model Aggregation Characteristics"),
+	Geom.subplot_grid(Geom.point,Geom.smooth(smoothing=1.0),Geom.hline(color="pink"),free_y_axis=true),
+	Theme(default_color="black")
+)
+
+# ╔═╡ 7ac9f47d-c661-46ee-8f03-4029d248550d
+draw(
+	PNG(
+		joinpath(output_dir, "aggregated_benefits_chart.png"), 
+		12cm, 
+		15cm,
+		dpi=500
+	), agg_results
+)
+
+# ╔═╡ 8ee0146c-e3c3-4a16-b527-ee1e3da663fa
+mean(filter( x -> x.model == "EPW", aggregated_results).count)
+
+# ╔═╡ e89c179f-3de0-4613-bbf5-fd936572ce5c
+full_aggregation_results = combine(groupby(aggregated_results, [:model, :energy, :variable]), :value => mean, renamecols=false);
+
+# ╔═╡ 0b50394f-5800-449b-89bb-d62db694d174
+Gadfly.plot(
+	full_aggregation_results,
+	y=:model,
+	xgroup=:variable,
+	x=:energy,
+	color=:value,
+	Geom.subplot_grid(Geom.rectbin)
+)
+
+# ╔═╡ 0915512e-f2fc-432f-9ba7-ba1b3f8cb1ef
+begin
+	cvagg = filter( x -> x.variable == "cvrmse", full_aggregation_results)
+	nmagg = filter( x -> x.variable == "nmbe", full_aggregation_results)
+	stagg = filter( x -> x.variable == "cvstd", full_aggregation_results)
+	rmagg = filter( x -> x.variable == "rmse", full_aggregation_results)
+
+	ua₁ = Gadfly.plot(
+		cvagg,
+		y=:energy,
+		x=:model,
+		color=:value,
+		Geom.rectbin,
+		Guide.xlabel(""),
+		Guide.ylabel(""),
+		Guide.title("CVRMSE"),
+		Guide.colorkey(title=""),
+		Scale.ContinuousColorScale(
+			palette -> get(ColorSchemes.Reds, palette),
+		),
+	)
+
+	ua₂ = Gadfly.plot(
+		nmagg,
+		y=:energy,
+		x=:model,
+		color=:value,
+		Geom.rectbin,
+		Guide.xlabel(""),
+		Guide.ylabel(""),
+		Guide.title("NMBE"),
+		Guide.colorkey(title=""),
+		Scale.ContinuousColorScale(
+			palette -> get(ColorSchemes.YlOrBr, palette),
+		),
+	)
+
+	ua₃ = Gadfly.plot(
+		stagg,
+		y=:energy,
+		x=:model,
+		color=:value,
+		Geom.rectbin,
+		Guide.xlabel(""),
+		Guide.ylabel(""),
+		Guide.title("CVSTD"),
+		Guide.colorkey(title=""),
+		Scale.ContinuousColorScale(
+			palette -> get(ColorSchemes.Blues, palette),
+		),
+	)
+
+	ua₄ = Gadfly.plot(
+		rmagg,
+		y=:energy,
+		x=:model,
+		color=:value,
+		Geom.rectbin,
+		Guide.xlabel(""),
+		Guide.ylabel(""),
+		Guide.title("RMSE"),
+		Guide.colorkey(title=""),
+		Scale.ContinuousColorScale(
+			palette -> get(ColorSchemes.Purples, palette),
+		),
+	)
+
+	uaoo = vstack(ua₁, ua₂, ua₃, ua₄)
+end
+
+# ╔═╡ 107b60fa-692b-4c87-944b-ae606a3a353a
+draw(
+	PNG(
+		joinpath(output_dir, "aggregated_benefits_map.png"), 
+		15cm, 
+		20cm,
+		dpi=500
+	), uaoo
+)
+
+# ╔═╡ f00265ca-fa8a-43f2-bde5-8924934a9406
+yuu = combine(groupby(select(vcat(council_results, council_resultsᵧ), Not(:council_region)), [:model,:energy]), [:cvrmse, :nmbe, :rmse] .=> mean, renamecols=false)
+
+# ╔═╡ 9e6f7e27-a4bb-434b-8daf-7a0d831118ee
+latexify(yuu, latex=false, fmt = FancyNumberFormatter(4), env=:table)
+
+# ╔═╡ 3b26f240-30f8-4894-9dab-8ce65a7cac4b
+o₀ = test_suite(combine(groupby(leftjoin(
+		teₐ′₀,
+		select(testbuilding_information, ["Property Id","council_region"]),
+		on="Property Id"
+), ["council_region","date", "model"]),
+	[:prediction, :recorded] .=> sum,
+	nrow,
+	renamecols=false
+), ["council_region"], true, true)
+
+# ╔═╡ f3d1d8e2-2063-42e8-8c52-7ee56fd20892
+Gadfly.plot(o₀, x = :count, y = :rmse, Geom.point, Geom.line)
 
 # ╔═╡ 0e4ed949-b051-4ae5-8b7b-b1c8d6d7fc94
 function electricaggregation(individual_results)
@@ -3242,10 +3422,13 @@ end
 
 # ╔═╡ Cell order:
 # ╠═ac97e0d6-2cfa-11ed-05b5-13b524a094e3
+# ╠═d75e2748-fa12-45f2-a380-e53ba1826893
+# ╠═3bf1db0d-fb5e-4212-8dac-5e9c009ad77f
 # ╠═aeb3597f-ef6a-4d21-bff5-d2ad359bc1a2
 # ╠═9d5f897f-7f25-43ed-a30c-064f21e50174
 # ╠═786c2441-7abb-4caa-9f50-c6078fff0f56
 # ╠═1c7bfba6-5e1d-457d-bd92-8ba445353e0b
+# ╠═5bfda8cf-487b-4930-b212-9cd1622367de
 # ╟─9b3790d3-8d5d-403c-8495-45def2c6f8ba
 # ╠═bf772ea4-c9ad-4fe7-9436-9799dcb0ad04
 # ╠═020b96e3-d218-470d-b4b0-fc9b708ffdf3
@@ -3338,6 +3521,8 @@ end
 # ╠═a62b17d9-3d2b-4985-b982-78b557a5889c
 # ╠═32e235c8-212e-40bb-9428-74ea2a78b900
 # ╠═9e3961f4-fa02-4ce6-9655-484fb7f7e6dc
+# ╠═055aaebf-84ea-49dc-8f15-85a0e2e48b49
+# ╠═36cc54b3-1e48-4f9a-9b34-b3bac0394eb8
 # ╠═c331ec69-2b5c-4ba9-8a7d-7130a27c320f
 # ╠═b5f8ce76-008a-491d-9537-f1b8f4943880
 # ╠═5ddf5811-9d4c-4375-8ae9-268bcb9e7ed5
@@ -3381,9 +3566,9 @@ end
 # ╠═850ddd0b-f6ea-4743-99ca-720d9ac538a0
 # ╠═90227375-6661-4696-8abd-9562e08040bf
 # ╠═aeeab107-8e68-4d0f-a3e3-8b1e0c12e8e6
+# ╠═c5e5a5e3-e324-4c8b-8449-caccc87cf8b6
 # ╠═ea1a797c-da0a-4133-bde5-366607964754
 # ╠═e5f7e860-4802-42a1-822d-51fcc983dfae
-# ╠═019f1c79-440c-42aa-9483-d64389876336
 # ╟─8edfe547-f860-418f-8c68-e8fe0c16162f
 # ╠═ecb078da-702d-46f7-846a-4759b3e0f172
 # ╠═6d5c77c8-2596-45eb-8163-c8e14249948d
@@ -3400,8 +3585,8 @@ end
 # ╠═402e380d-a91c-45f7-9fbb-5a2c44e754f7
 # ╠═167d31ad-76f2-432d-8550-ba015cb18e9d
 # ╟─eea75399-d25c-46b6-a471-2cb8676e4db7
-# ╟─e38eee70-b9b0-4dca-ae86-697fc5738cfa
-# ╟─a07ac65e-3e19-411e-9967-af9778d8a45d
+# ╠═e38eee70-b9b0-4dca-ae86-697fc5738cfa
+# ╠═a07ac65e-3e19-411e-9967-af9778d8a45d
 # ╟─efbe759f-ec6c-46a3-b4aa-8fa051f31151
 # ╠═7dcd284f-3ed4-47bd-aabf-a91e7f939910
 # ╠═a8d738bb-0424-4df0-aa22-2a299fd994b1
@@ -3445,7 +3630,7 @@ end
 # ╠═a084f5b5-05f4-421c-aa22-dc61511c8002
 # ╠═764c858a-8810-4498-b0fe-300a3ecf8488
 # ╠═38c79d97-e5da-415b-a1f1-45a093aeeb2f
-# ╟─29672872-98e2-454f-b5c2-49966f11e15f
+# ╠═29672872-98e2-454f-b5c2-49966f11e15f
 # ╟─61705c8f-a3e2-4d4b-bd52-a334a0a9f5bd
 # ╟─0e4ed949-b051-4ae5-8b7b-b1c8d6d7fc94
 # ╟─3c41548c-da78-49c5-89a3-455df77bf4fa
@@ -3512,6 +3697,7 @@ end
 # ╠═685169a0-e65c-439c-a5ba-068c83258200
 # ╠═d0c234cc-9620-4c9c-bfae-f32b68b9d31f
 # ╠═ae507fc7-5a13-42ed-a477-79d0b11c2efb
+# ╠═51691a55-d79e-4f2f-a223-785a11e8162f
 # ╠═19ffec1f-43f7-49af-91be-2553d8998951
 # ╟─0773b0fe-5a8a-4079-9e14-1ea5520a4bdb
 # ╠═fe9f7509-2ba7-45f2-bcf5-84312660d754
@@ -3519,6 +3705,7 @@ end
 # ╠═a282de0c-aa3b-494a-84a2-9d37e20d1adc
 # ╠═5b136482-1013-4c51-8e52-cdbf0ab96735
 # ╠═92e7c0a0-19df-43e2-90db-4e050ba90c5d
+# ╠═ec420749-2c5e-4b70-a476-ff8be50f6fca
 # ╠═f5b41025-e072-4d42-b7aa-0982ddf01982
 # ╠═a0cd5e68-3bd0-4983-809e-ce7acd36a048
 # ╠═ed696113-737b-46f5-bfb1-c06d430a83ac
@@ -3527,6 +3714,7 @@ end
 # ╠═05a040cf-f6ac-42b2-bcb1-599af5a26038
 # ╠═41751922-2646-45fd-b6e0-7ca2109cc642
 # ╠═c1e6a0a2-5252-413a-adf9-fa316d0a6b0a
+# ╟─e98994c4-78ab-4d08-a1a0-e8fb3f3e79a7
 # ╠═11277ca6-3bbf-403f-8cfc-2aabf94069f7
 # ╠═b0f7e467-684b-41dd-b046-ed378dded683
 # ╠═38b3911a-8db5-47f4-bd1b-0d77a207188f
@@ -3535,7 +3723,6 @@ end
 # ╠═7b05ec74-6edc-4f44-bf9d-9389d4029494
 # ╟─c546d3af-8f24-40bd-abfa-e06c708c244e
 # ╟─5db964da-1ebc-478a-a63a-cf4f713c7aa8
-# ╠═fa72b6f2-de9b-430c-9ab6-f799157f1570
 # ╠═778dc2a7-4e9b-4f97-b34d-6a7adc38abc2
 # ╠═5953c75a-0e6d-40c4-8e4b-b8de6920acf3
 # ╠═c7874fdb-2ba4-4dbf-89b4-0b3af493b256
@@ -3593,9 +3780,9 @@ end
 # ╠═c15b52c1-5d06-4fea-8645-91f92bfa716b
 # ╠═07c78fb1-bcf4-40fd-9209-d3220d014912
 # ╠═15b3535f-6776-409d-8e6a-457b4c6eba78
+# ╠═0c61beac-7fdb-4f05-a04c-f2a042ba34b2
 # ╠═d96c7a96-0875-4ebd-a1ba-e40db8008aed
 # ╠═734ed2d0-4657-4361-9285-97605371af72
-# ╠═42360e3a-afae-4fd0-a919-d9f1668865ce
 # ╠═d1eaa0ee-8c7d-4b1b-a3c6-030fffd320c4
 # ╠═43a39165-1f9b-49e7-a4bc-c47583c25b10
 # ╠═f2067017-32c8-493b-a9fb-3a89f9e549e4
@@ -3603,11 +3790,45 @@ end
 # ╠═77456db6-b0fa-4ba6-9d41-1c393f7ddee1
 # ╠═08b888e3-9d37-43a6-9656-4bf6cb62d324
 # ╠═bf71086c-a8f0-4420-b698-73499fec5257
-# ╟─8df28d8b-443e-48a3-89e4-a5824d3d66c8
 # ╠═4c99c655-ae95-4a28-95c8-e7ca38ddf55f
+# ╟─372df76a-fd5d-4b84-ad83-988af1e78cf7
 # ╠═459dbe8b-08f7-4bde-ba6d-ee4d05d1836f
+# ╠═c05dd607-1ce4-4931-9e23-2a9dad7cc039
 # ╠═ae386c52-ff6b-4493-96ff-6c14d1c46db8
 # ╠═94580726-88ed-4a69-a101-9c792e3ed44b
+# ╠═a3a49ba6-7272-4739-b11d-f09692afa46f
+# ╠═cb96e206-8779-4c02-abd2-74948e13f263
+# ╠═daf769b3-bcd3-4476-bdfb-492a90cd1225
+# ╠═1ddf99ee-0dfa-4dc2-82e4-8e065e78c992
+# ╠═979e8ca8-105c-4f84-a20b-e3bd729495b4
+# ╠═467a06fe-2360-442d-b8b6-bbcbb09681f8
+# ╠═5d7e9b7a-aa1b-4737-94e4-a5df1de8ecc6
+# ╠═6cc61a93-1143-42a1-9b8d-9a3f506db3df
+# ╠═20cc6945-d767-41e1-8a6b-1d88084a9781
+# ╠═4acabffb-ed34-4847-9ce2-c30031392ecc
+# ╠═a7ef8e5a-ce04-4a3c-8ef8-421990f176a3
+# ╠═50fee719-874e-42f6-8375-b0bcb9689c3c
+# ╠═faecba7d-a52c-4d8f-a4a5-14f3610cb827
+# ╠═923da0d6-8333-4335-ad95-1fdc47cde9cb
+# ╠═8dec16f2-f672-4a37-b6c6-6d2e7fad9b7c
+# ╠═a52dae0c-ce46-4a24-b6fc-02fb5226dcda
+# ╠═ac0375e0-131d-49d8-900e-754fa167c13b
+# ╠═44a94b75-ea19-40a8-a863-e362c651c8a2
+# ╠═adbe4ee5-62e7-42c6-baab-e42a3c4af4cc
+# ╠═ab0f2a21-2ce6-4fa5-960b-325ef778304f
+# ╠═81f70fa7-0240-4868-ac9a-73a119b4e831
+# ╠═cf5ef024-edbb-4468-99af-06064358a8ab
+# ╠═d41e7488-5655-487c-ba31-19be428fff2b
+# ╠═b67fab52-d0e0-45b9-8eba-99b4bca34182
+# ╠═62cdf00d-86c4-4ad3-bf64-dfbaa4d6c6e6
+# ╠═67e2b019-47bd-4473-974d-b5fbfcc55f18
+# ╠═61e30268-26f3-4940-8e9d-b9d5c54f4da0
+# ╠═b90dcb6c-70fe-4b7f-b91a-15a8e78d8411
+# ╠═e008e66b-40f1-474c-ad3b-f64e542c7499
+# ╠═33a3ddb2-898e-4bec-bc45-3cd65e8ddbd0
+# ╠═c66a453b-c9b6-427f-ac13-a392626955e1
+# ╠═9cbf5154-b634-44e5-8646-74468f8977f5
+# ╠═f4d83c51-650f-4ed3-856b-f39f74fd6e0e
 # ╠═6f78dd2a-c225-41c7-b6a9-5f0925f87d14
 # ╠═ea5f7773-0697-4ead-adc9-0eabbd0fa05e
 # ╠═b2bf0ddc-a327-4b13-9722-130a0ddebffb
@@ -3617,6 +3838,8 @@ end
 # ╠═ec90e969-6183-4e98-b2ab-3a53eee7b13b
 # ╟─f54d3095-8e78-4f36-8f81-a022c6c501d6
 # ╠═051fc252-5267-4c8b-8ead-75f37a49a440
+# ╠═148923dc-8802-4af2-9c4b-ec41ad842366
+# ╠═be498601-d19d-43ab-8bbb-aed717728e63
 # ╟─96dd4c14-6791-4c8c-80c1-8f0301e34b35
 # ╠═4df27234-b5b1-4607-b955-c2710257ffd6
 # ╠═0691bffd-6b86-41ce-8044-5474545f9417
@@ -3624,6 +3847,47 @@ end
 # ╠═d15506e2-5213-48fc-bf6a-fbe6e99af3de
 # ╠═f75ae159-d811-47dc-8592-73a8048244fb
 # ╠═9e2aef0c-0121-4652-ad40-62ad5e8d0a0e
+# ╠═c5899e25-25b2-43ec-8e9a-3e7e9af8f50d
+# ╠═3e8fd197-59fd-4547-8437-45456dec8f8d
+# ╠═4eb5ef29-57d2-42e8-8579-411964792f72
+# ╠═08c44240-6481-4af1-8473-b9cf1d91ef3c
+# ╠═aba25e76-c18f-44de-b57b-c3aa8f5be42d
+# ╠═e85de5cc-219b-4e1d-a16d-1e84d657b870
+# ╠═3b26f240-30f8-4894-9dab-8ce65a7cac4b
+# ╠═f3d1d8e2-2063-42e8-8c52-7ee56fd20892
+# ╠═85375b75-1bff-4f4a-a093-4bb55e752c0f
+# ╠═d9ac0584-db8f-497e-807f-9b207b0a6151
+# ╠═5a4110cf-6700-4b82-bdcf-4c724e342d1c
+# ╠═f254e3f8-a5a3-4d83-b2d8-50552bcd2edf
+# ╠═44e249fc-dea4-464b-b8a8-94ef304f5769
+# ╠═c5903324-c203-43d5-9f0c-b5c7ba03af07
+# ╠═38d0794b-a374-4a18-94d3-ba0ff3d8bba0
+# ╠═b7dcfb1b-0f90-4fad-9e3d-032944a24eca
+# ╠═c1287f32-e270-47fc-8b18-38394380e76e
+# ╠═14357463-a585-409b-bbe1-a02bfd086c61
+# ╠═1732eaee-3259-4982-9dae-69eed1c8b56d
+# ╠═a440743b-6595-4bfa-93a7-36784dc965a3
+# ╠═61186b87-03ed-4cbd-bbfb-cecb98ab9313
+# ╠═add11e32-0299-4d2b-8d12-6c7436f3b49d
+# ╠═cdd6fcc4-0e63-4e9d-ac8b-e8a366f83625
+# ╠═e4cfe664-c46b-4626-a6f3-42d87b98e868
+# ╠═82d00718-cc23-42b6-9902-bb0032fde744
+# ╠═dbe1f66c-e9ab-4d29-8846-20031c93abf1
+# ╠═f2300c70-9eba-4711-a35b-cec5ae8340f5
+# ╠═c4716c23-2924-4751-a303-e688b71199ab
+# ╠═64fde861-20a5-4cdf-ab7e-d1409018ffe2
+# ╠═1938a66f-9f6e-4b5c-9f67-6ba5c99d8bd1
+# ╠═b02061e3-e42a-4581-b085-96b02fb19b52
+# ╠═f00265ca-fa8a-43f2-bde5-8924934a9406
+# ╠═9e6f7e27-a4bb-434b-8daf-7a0d831118ee
+# ╠═d36a7409-2441-4e04-b704-c389b4e690d0
+# ╠═8ee0146c-e3c3-4a16-b527-ee1e3da663fa
+# ╠═7ac9f47d-c661-46ee-8f03-4029d248550d
+# ╠═e89c179f-3de0-4613-bbf5-fd936572ce5c
+# ╠═0b50394f-5800-449b-89bb-d62db694d174
+# ╠═0915512e-f2fc-432f-9ba7-ba1b3f8cb1ef
+# ╠═107b60fa-692b-4c87-944b-ae606a3a353a
+# ╠═03ce5f2e-e11d-4a4a-95c4-37b1c931ec18
 # ╟─329d55b8-eb72-4a1e-a4e8-200fee0e0b9d
 # ╠═b5ce80a3-e177-4c4f-920b-5dee87f2bc3b
 # ╠═c92ab000-dbe9-457d-97f3-88ae31b57a27
@@ -3633,68 +3897,6 @@ end
 # ╠═624ab4a3-5c3b-42f3-be37-89d6382fdfdd
 # ╟─ec97d987-651d-4efa-a36f-e6be9f18e0fd
 # ╟─b1f8755d-8130-4492-859e-781225f8bb45
-# ╠═f32949e9-d644-4cbc-aed6-74a5e0825664
-# ╠═b8764c1b-4fc7-4efc-b706-3daad124dfde
-# ╠═b2d422e0-d2b4-4b60-8e79-a9b4754f7e27
-# ╠═77d37af6-212e-4d8b-9e29-c4873d10ca78
-# ╠═08844605-1dd5-42f6-ac05-bcb57a1ff985
-# ╠═38672535-b7ca-46e7-afc0-4d8aa2200c95
-# ╠═68d4b11c-2c00-4de1-9be8-099128ee0629
-# ╠═e8fbf241-8eda-4723-a6b3-f76a9fadc487
-# ╠═fcc6904a-af26-44eb-9e03-2d6ba83bb111
-# ╠═9a279e3b-a26d-4b16-bcee-4a712f81bdd6
-# ╠═ce8ce8f4-7e5e-4a07-b434-74933a48d112
-# ╠═c3825758-c3d3-4d2e-ac20-37acd7d3ff16
-# ╠═e2bcd8f3-75fc-4e02-9d4a-eba3a9d01b30
-# ╠═06903f32-5069-42df-8ca3-4cac0011bd64
-# ╠═35eb8005-c75b-462a-aa7b-b1322ca55664
-# ╠═99acd1ef-17ef-47ca-84c3-0c7956e1c27d
-# ╠═5617fff4-d3a6-4852-832e-fad36c8c1ec1
-# ╠═9da17695-6f7a-4a37-90ef-34d6adedbd8c
-# ╠═8baea97a-f9a3-43a3-be07-6f0ffda6e60a
-# ╠═3b00cc15-14fd-471f-b48c-8db92496684e
-# ╠═6c4d5d37-4cc8-4bc4-9842-d18c0ce7ec4f
-# ╠═3612d185-8a7c-409f-952b-b17532a484dd
-# ╠═479e8b29-ab02-4075-9711-599ded8807b3
-# ╠═bfaf76d3-562f-498b-a031-fa07f459c4b4
-# ╠═cb292cfb-32c8-441f-ab7e-5cc908234d17
-# ╠═b2c52c2e-9972-4a52-9345-b4c768b76494
-# ╠═c1fbea75-d24f-4049-b9be-93d1d4f391c9
-# ╠═4130dfc2-56bc-41ef-83e1-ad9a0f2ff1fe
-# ╠═648a99e0-6ee6-4489-a5bb-be1fa853fb23
-# ╠═300b043c-e73a-41ae-b041-707e5365f597
-# ╠═1ddfcf7e-2958-4f5c-b43e-6f8393b5bdbd
-# ╠═b2cc7582-8878-4ac1-a12b-79117c0dad93
-# ╠═604d254b-3d86-48bb-a22f-5d56771afdb4
-# ╠═ad41ec1e-c21c-46aa-8da1-e5bbf6fedcb5
-# ╠═cde6098d-9ec2-47e1-ad7f-02b910caa196
-# ╠═c01746c5-391a-497c-b9d3-10ddd2b1f7f5
-# ╠═261a1d4e-adbf-4fdc-b3cc-b7e3ab8a1974
-# ╠═53571901-8805-4c9c-b222-274c6a4cfa4f
-# ╠═053a7bc6-bf65-48be-bca5-f0ff615abc40
-# ╠═a5841fe0-3f2d-4c86-976c-69eff2fc04b5
-# ╠═0f0a2e2e-599d-45cd-b997-0fd7f77f68e1
-# ╠═e71a83ea-2035-488d-8639-9837e79d1c30
-# ╠═861d9d1d-e542-4de2-a4df-8ce3771dad64
-# ╠═02e93f83-be74-4614-a0ff-2b1044198975
-# ╠═89b9cce5-b297-48c9-a4b6-3a7b43952294
-# ╠═32715449-730c-4201-9c61-96b68ba6635f
-# ╠═5b29638f-47fd-4b3a-bc51-cd35bcecf88e
-# ╠═c5575618-9027-484f-85c0-aa239f239dbe
-# ╠═95d01f67-5b46-46c9-9403-53070829571e
-# ╠═cb6a77d5-cfdf-4a04-bafc-c5051568ff1d
-# ╠═05346d5e-081e-4139-97cb-99283ba1342b
-# ╠═0409ff93-8ece-4cef-a44d-1c36ea4a9c5f
-# ╠═ddb913c3-e62c-48f8-8b65-4b281bdd33ab
-# ╠═f07cf5b3-acc0-40ef-b997-76e4d5313aec
-# ╟─cc58368b-bbcc-4849-ad3f-bec12ad3e16f
-# ╠═f4a21906-1857-418c-ba74-1d7d4f11509b
-# ╠═bd742e20-2fe6-40f6-9d0e-9922a907e7d3
-# ╠═38c6250b-1c74-4c6a-be38-7612bd2cd06b
-# ╠═ed2dccce-905e-4503-8c70-5cecd9d80734
-# ╠═83ed5fe5-5f0e-4b0e-9ac4-f82e06940726
-# ╠═7b7cf78f-efb0-44b7-ae43-b413b79eb9d2
-# ╠═b810a51c-7372-40df-a613-4112b53e547b
 # ╠═64b19240-6e2a-4bb9-b681-5d4fdcc98935
 # ╠═fbdc69a6-7227-4df8-a9a9-eca836565a11
 # ╠═92bd44dc-c382-4835-b6ed-351756703389
