@@ -12,6 +12,7 @@ using CSV
 using DataFrames
 using DataStructures
 using Dates
+using Formatting
 using Gadfly
 using Statistics
 using YAML
@@ -30,6 +31,12 @@ using ComputationalResources
 
 Random.seed!(1)
 rng = MersenneTwister(1);
+
+## utility function
+function commas(num::Integer)
+    str = string(num)
+    return replace(str, r"(?<=[0-9])(?=(?:[0-9]{3})+(?![0-9]))" => ",")
+end
 
 # ╔═╡ 9b3790d3-8d5d-403c-8495-45def2c6f8ba
 md"""
@@ -122,12 +129,16 @@ test_metadata = DataFrames.select(unique(test, "Property Id"), [
 
 epw_p = joinpath(input_dir, "epw.csv")
 # building the paths for all of the environmental features
+
+cmip_p = joinpath(input_dir_environmental, "cmip.csv")
+cmip_r = CSV.read(cmip_p, DataFrame; dateformat=date_f);
+
 era5_p = joinpath(input_dir_environmental, "era5.csv")
 landsat8_p = joinpath(input_dir_environmental, "landsat8.csv")
 # lst_aqua_p = joinpath(input_dir_environmental, "lst_aqua.csv")
 # lst_terra_p = joinpath(input_dir_environmental, "lst_terra.csv")
 noaa_p = joinpath(input_dir_environmental, "noaa.csv")
-sentinel_1C_p = joinpath(input_dir_environmental, "sentinel_1C_rename.csv")
+sentinel_1C_p = joinpath(input_dir_environmental, "sentinel_1C.csv")
 # sentinel_2A_p = joinpath(input_dir_environmental, "sentinel_2A.csv")
 viirs_p = joinpath(input_dir_environmental, "viirs.csv")
 
@@ -170,8 +181,8 @@ landsat8_r.ST_B10 = landsat8_r.ST_B10 .* 0.00341802 .+ 149.0 .- 273.15
 # ╔═╡ cc20d207-016e-408c-baf1-83d68c4c0fde
 noaa_r = DataFrames.select(CSV.read(noaa_p, DataFrame; dateformat=date_f), Not(:ACPC01));
 
-# # ╔═╡ 0a22f19d-c662-4071-b4e2-6e8103a0f359
-sentinel_1C_r = CSV.read(sentinel_1C_p, DataFrame; dateformat=date_f);
+# renaming this because landsat also has an ndvi metric
+sentinel_1C_r = rename!(CSV.read(sentinel_1C_p, DataFrame; dateformat=date_f), :NDVI => :NDVI_S);
 
 # # ╔═╡ a9f2d94d-cbf8-4d47-a4b2-438f451882e5
 # sentinel_2A_r = CSV.read(sentinel_2A_p, DataFrame; dateformat=date_f);
@@ -193,7 +204,7 @@ strip_month!(epw_r)
 
 # strip_month!(era5_r)
 strip_month!(landsat8_r)
-# strip_month!(lst_r)
+strip_month!(cmip_r)
 strip_month!(noaa_r)
 strip_month!(sentinel_1C_r)
 # strip_month!(sentinel_2A_r)
@@ -305,11 +316,15 @@ describe(sar_r, :nmissing)
 agg_terms = 	["Property Id","date"]
 
 # ╔═╡ 637220ba-c76a-4210-8c08-fde56b86366a
-functional_terms = [f₁ f₃ f₅]
 
+# for the comprehensive case
+# functional_terms = [f₁ f₃ f₅]
 
+# for the explainable case
+functional_terms = f₃
 
 # ╔═╡ 3da877c2-159b-4d0d-8b97-34da4dbf2ac3
+cmip = 			monthly_aggregation(cmip_r, agg_terms, functional_terms);
 epw = 			monthly_aggregation(epw_r, agg_terms, functional_terms);
 era5 = 			monthly_aggregation(era5_r, agg_terms, functional_terms);	
 landsat8 = 		monthly_aggregation(landsat8_r, agg_terms, functional_terms);
@@ -519,7 +534,7 @@ t₁ = Gadfly.plot(
 		x=:date,
 		y=:ST_B10,
 		Geom.point,
-		Geom.smooth(smoothing=0.15),
+		Geom.line,
 		# Geom.line,
 		Theme(default_color="lightcoral", line_width=1.2pt, point_size=2pt)
 	),
@@ -592,7 +607,7 @@ end
 
 # ╔═╡ a157969b-100a-4794-a78e-2f40439e28d9
 comprehensive_datalist = [
-	# cmip,
+	cmip,
 	dynam,
 	noaa,
 	# era5,
@@ -731,7 +746,7 @@ sample_buildingsᵧ = sample(
 	n_buildings
 )
 
-@info "Sample of building ids in CV fold: " sample_buildings[1:3]
+# @info "Sample of building ids in CV fold: " sample_buildings[1:3]
 	
 building_boolmap = map( x -> x ∈ sample_buildings, tₐ′[:,"Property Id"] );
 building_boolmapᵧ = map( x -> x ∈ sample_buildingsᵧ, tᵧ′[:,"Property Id"] );
@@ -772,8 +787,8 @@ n = 75
 roundsᵣ = range(m_tree, :nrounds, lower=50, upper=150, scale=:linear);
 max_depthᵣ = range(m_tree, :max_depth, lower=4, upper=10, scale=:linear);
 ηᵣ = range(m_tree, :eta, lower=0.07, upper=0.4, scale=:linear);
-γᵣ = range(m_tree, :gamma, lower=0, upper=1.0, scale=:linear);
-αᵣ = range(m_tree, :alpha, lower=0, upper=20, scale=:linear);
+γᵣ = range(m_tree, :gamma, lower=0, upper=50.0, scale=:linear);
+αᵣ = range(m_tree, :alpha, lower=0, upper=30, scale=:linear);
 λᵣ = range(m_tree, :lambda, lower=0.0, upper=1.0, scale=:linear);
 rowsampleᵣ = range(m_tree, :rowsample, lower=0.3, upper=1.0, scale=:linear);
 colsampleᵣ = range(m_tree, :colsample, lower=0.3, upper=1.0, scale=:linear);
@@ -807,7 +822,15 @@ end;
 begin
 modelname = string(hash((loss_function, fitting_terms, n, sampling_strategy, sampling_strategyᵧ, functional_terms)))[end-5:end]
 output_dir = joinpath(joinpath(data_path, "p3_o"), modelname)
+smlink_path = joinpath(joinpath(data_path, "p3_o"), "recent")
 mkpath(output_dir)
+
+# for convenience, we can link the most recent file for easy indexing
+if isdir(smlink_path)
+	rm(smlink_path)
+end
+symlink(output_dir, smlink_path; dir_target = true)
+
 machines_dir = joinpath(output_dir, "machines")
 dataout_dir = joinpath(output_dir, "data_out")
 
@@ -834,7 +857,10 @@ draw(
 )
 
 ## save the training data files
+@info "Writing electric training to file..."
 CSV.write(joinpath(output_dir, "training_electric.csv"), tₐ′);
+
+@info "Writing gas training to file..."
 CSV.write(joinpath(output_dir, "training_gas.csv"), tᵧ′);
 
 begin
@@ -845,19 +871,19 @@ open(joinpath(output_dir, "config.txt"), "w") do f
 	println(f, "Loss function: \t\t\t\t", string(loss_function))
 	println(f, "Functions used:\t\t\t\t", string(functional_terms))
 	println(f, "")
-	println(f, "Electric Training - #Buildings", string(length(electric_train_buildings)))
-	println(f, "Electric Training Data - #Samples:\t\t", nrow(tₐ′))
-	println(f, "Electric Test - #Buildings", string(length(electric_test_buildings)))
-	println(f, "Electric Test Data - #Samples:\t\t", nrow(teₐ′))
+	println(f, "Electric Training - #Buildings\t\t", Formatting.format(length(electric_train_buildings), commas=true))
+	println(f, "Electric Training Data - #Samples:\t", Formatting.format(nrow(tₐ′), commas=true))
+	println(f, "Electric Test - #Buildings\t\t\t", Formatting.format(length(electric_test_buildings), commas=true))
+	println(f, "Electric Test Data - #Samples:\t\t", Formatting.format(nrow(teₐ′), commas=true))
 
-	println(f, "Gas Training - #Buildings", string(n_gas_training_buildings))
-	println(f, "Gas Training Data - #Samples:\t\t", nrow(tᵧ′))
-	println(f, "Gas Test - #Buildings", string(n_gas_test_buildings))
-	println(f, "Gas Test Data - #Samples:\t\t", nrow(teᵧ′))
+	println(f, "Gas Training - #Buildings\t\t\t", Formatting.format(n_gas_training_buildings, commas=true))
+	println(f, "Gas Training Data - #Samples:\t\t", Formatting.format(nrow(tᵧ′), commas=true))
+	println(f, "Gas Test - #Buildings\t\t\t\t", Formatting.format(n_gas_test_buildings, commas=true))
+	println(f, "Gas Test Data - #Samples:\t\t\t", Formatting.format(nrow(teᵧ′), commas=true))
 
-	println(f, "Cross-validation n-samples:\t", n_buildings)
-	println(f, "Cross-validation folds:\t\t", length(sampling_strategy))
-	println(f, "Hypercube Samples:\t\t\t", n)
+	println(f, "Cross-validation n-buildings:\t\t", Formatting.format(n_buildings, commas=true))
+	println(f, "Cross-validation folds:\t\t\t\t", Formatting.format(length(sampling_strategy), commas=true))
+	println(f, "Hypercube Samples:\t\t\t\t\t", Formatting.format(n, commas=true))
 	println(f, "")
 	for i in eachindex(notes)
 		@info notes[i]
@@ -922,6 +948,27 @@ m_tree_tuningᵧ = TunedModel(
 
 # temportary stop before training
 
+# ╔═╡ 2426e2d6-e364-4e97-bee8-7defb1e88745
+md"""
+##### CMIP
+"""
+
+# ╔═╡ 9c8f603f-33c6-4988-9efd-83864e871907
+term₃ = unique([names(cmip)..., electricity_terms...])
+
+if !isfile(joinpath(dataout_dir, "tea3.csv"))
+m₃, v′₃, teₐ′₃ = electrictrain("CMIP", term₃);
+MLJ.save(joinpath(machines_dir, "m3.jlso"), m₃);
+CSV.write(joinpath(dataout_dir, "tea3.csv"), teₐ′₃);
+@info "CMIP Model:" fitted_params(m₃).best_model
+@info "CMIP Quality:" report(m₃).best_history_entry.measurement
+
+m₃ = nothing
+teₐ′₃ = nothing
+else
+	@info "Found CMIP Model."
+end
+
 # ╔═╡ dbae822c-24fa-4767-aaaa-d6bd8ad700ac
 if !isfile(joinpath(dataout_dir, "tea0.csv"))
 term₀ = unique([electricity_terms...])
@@ -938,6 +985,7 @@ teₐ′₀ = nothing
 else
 @info "Found Null Model."
 end
+
 
 # ╔═╡ ee57d5d5-545e-4b70-91d9-b82a108f854b
 md"""
@@ -1183,6 +1231,27 @@ mᵧ₀ = nothing
 teᵧ′₀ = nothing
 else
 	@info "Found Null Gas Model."
+end
+
+# ╔═╡ 2426e2d6-e364-4e97-bee8-7defb1e88745
+md"""
+##### CMIP
+"""
+
+# ╔═╡ 9c8f603f-33c6-4988-9efd-83864e871907
+termᵧ₃ = unique([names(cmip)..., naturalgas_terms...])
+
+if !isfile(joinpath(dataout_dir, "teg3.csv"))
+mᵧ₃, vᵧ′₃, teᵧ′₃ = gastrain("CMIP", termᵧ₃);
+MLJ.save(joinpath(machines_dir, "mg3.jlso"), mᵧ₃);
+CSV.write(joinpath(dataout_dir, "teg3.csv"), teᵧ′₃);
+@info "CMIP Model - gas:" fitted_params(mᵧ₃).best_model
+@info "CMIP Quality - gas:" report(mᵧ₃).best_history_entry.measurement
+
+mᵧ₃ = nothing
+teᵧ′₃ = nothing
+else
+	@info "Found CMIP Gas Model."
 end
 
 md"""##### NOAA"""
