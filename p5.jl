@@ -28,8 +28,17 @@ using StatsBase
 # ╔═╡ 252aff18-14eb-41c8-a47f-900df098af2c
 using MLJ
 
-# ╔═╡ c721611f-d2c7-4ebf-8ad1-d29a8841cbda
+# ╔═╡ 8f159c5f-0994-4f25-bfde-e577bcaa8fe6
+using Latexify
+
+# ╔═╡ 68606de6-932b-48b8-8ea5-b33ee7bf347e
+using Compose
+
+# ╔═╡ dcda4940-6c1f-45f2-84c5-05ac616e1cc4
 using Plots
+
+# ╔═╡ df01f430-3d39-428e-a74b-24c67c8dbb07
+using Random
 
 # ╔═╡ 3c798c19-8fa9-49fd-bbb8-eb4b22681ce1
 import Cairo, Fontconfig
@@ -50,45 +59,11 @@ seasons = Dict(
 	12 => "Winter"
 )
 
-# ╔═╡ 5fc39f0b-7678-434d-bd4b-4b1a001891c1
-modelname = "684187"
+# ╔═╡ 7299bc57-f7c3-41d5-8a28-49e30799cf93
 
-# ╔═╡ 750c5adc-9f84-4a4a-9f8a-b9d347b00a2b
-begin
-sources_file = joinpath(pwd(), "sources.yml")
-sources = YAML.load_file(sources_file)
-data_destination = sources["output-destination"]
-data_path = joinpath(data_destination, "data", "nyc")
-	
-input_dir = joinpath(joinpath(data_path, "p3_o"), modelname)
-output_dir = joinpath(joinpath(data_path, "p5_o"), modelname)
-mkpath(output_dir)
 
-dataout_dir = joinpath(input_dir, "data_out")
-end;
+# ╔═╡ 0acd8872-98bc-4f2b-960d-d8d449d16407
 
-# ╔═╡ b5852716-bec1-4b41-bb36-1588751ca824
-begin
-# electric
-teₐ′₀ = CSV.read(joinpath(dataout_dir, "tea0.csv"), DataFrame)
-teₐ′₂ = CSV.read(joinpath(dataout_dir, "tea2.csv"), DataFrame)
-teₐ′₄ = CSV.read(joinpath(dataout_dir, "tea4.csv"), DataFrame)
-teₐ′₅ = CSV.read(joinpath(dataout_dir, "tea5.csv"), DataFrame)
-teₐ′₆ = CSV.read(joinpath(dataout_dir, "tea6.csv"), DataFrame)
-teₐ′₇ = CSV.read(joinpath(dataout_dir, "tea7.csv"), DataFrame)
-teₐ′₈ = CSV.read(joinpath(dataout_dir, "tea8.csv"), DataFrame)
-teₐ′ₑ = CSV.read(joinpath(dataout_dir, "teae.csv"), DataFrame)
-
-# natural gas
-teᵧ′₀ = CSV.read(joinpath(dataout_dir, "teg0.csv"), DataFrame)
-teᵧ′₂ = CSV.read(joinpath(dataout_dir, "teg2.csv"), DataFrame)
-teᵧ′₄ = CSV.read(joinpath(dataout_dir, "teg4.csv"), DataFrame)
-teᵧ′₅ = CSV.read(joinpath(dataout_dir, "teg5.csv"), DataFrame)
-teᵧ′₆ = CSV.read(joinpath(dataout_dir, "teg6.csv"), DataFrame)
-teᵧ′₇ = CSV.read(joinpath(dataout_dir, "teg7.csv"), DataFrame)
-teᵧ′₈ = CSV.read(joinpath(dataout_dir, "teg8.csv"), DataFrame)
-teᵧ′ₑ = CSV.read(joinpath(dataout_dir, "tege.csv"), DataFrame)
-end;
 
 # ╔═╡ 9462e8e8-5f45-48d2-978c-ff03695cc115
 common_terms = [
@@ -108,29 +83,11 @@ common_terms = [
 # ╔═╡ d53007de-27f5-4cbb-9012-cacb281d612b
 errfunc(deltay) = abs(deltay)
 
-# ╔═╡ 9289932b-2af7-4991-971f-96f6ef395b14
-begin
-test_terms = [teₐ′₀,teₐ′₂,teₐ′₄,teₐ′₅,teₐ′₆,teₐ′₇,teₐ′₈];
-resultsₑ = vcat([ DataFrames.select(x, common_terms) for x in test_terms ]...);
-resultsₑ.diff = errfunc.(resultsₑ.prediction .- resultsₑ.recorded);
-resultsₑ.fuel = repeat(["Electricity"], nrow(resultsₑ))
-resultsₑ
-end;
+# ╔═╡ 90d09570-3eab-4999-bb7b-4b74ccae2f6f
 
-# ╔═╡ 94a4b152-683f-450b-8016-1a3252b8ec56
-begin
-test_termsᵧ = [teᵧ′₀,teᵧ′₂,teᵧ′₄,teᵧ′₅,teᵧ′₆,teᵧ′₇,teᵧ′₈];
-resultsᵧ = vcat([ DataFrames.select(x, common_terms) for x in test_termsᵧ ]...);
-resultsᵧ.diff = errfunc.(resultsᵧ.prediction .- resultsᵧ.recorded);
-resultsᵧ.fuel = repeat(["Natural Gas"], nrow(resultsᵧ))
-resultsᵧ
-end;
 
-# ╔═╡ 9679fec5-be9b-4fa8-a699-b18f0ada44b9
-unique(resultsₑ.date)
+# ╔═╡ e4b11e6f-bc70-4470-b407-92eb192489ca
 
-# ╔═╡ 75a9d962-54bd-498d-a513-035e9a225eff
-results = vcat(resultsₑ, resultsᵧ);
 
 # ╔═╡ 73d18d6d-b236-4fd4-9981-e70f8c1c37b7
 nmbe(ŷ, y, p=1) = 100 * sum(y.-ŷ) / (( length(y)-p ) * mean(y) )
@@ -147,6 +104,167 @@ md"""
 Individual Building UBEM metrics
 """
 
+# ╔═╡ 50c292c1-dcbc-47bb-a545-1ca12a0784fe
+# modelname = "793244" # s1
+# modelname = "689269" # s2
+modelname = "746694" # s3
+
+# ╔═╡ 258dc61d-e20e-4ec3-a8c7-feca49515225
+modelname
+
+# ╔═╡ 750c5adc-9f84-4a4a-9f8a-b9d347b00a2b
+begin
+sources_file = joinpath(pwd(), "sources.yml")
+sources = YAML.load_file(sources_file)
+data_destination = sources["output-destination"]
+data_path = joinpath(data_destination, "data", "nyc")
+	
+input_dir = joinpath(joinpath(data_path, "p3_o"), modelname)
+output_dir = joinpath(joinpath(data_path, "p5_o"), modelname)
+mkpath(output_dir)
+
+dataout_dir = joinpath(input_dir, "data_out")
+end;
+
+# ╔═╡ 6f9bb8eb-977c-499a-9ee7-d34b58ecc03e
+epw = CSV.read(joinpath(data_path, "p1_o", "epw.csv"), DataFrame)
+
+# ╔═╡ 5b27b6a5-140b-41b6-b0d5-208b83c5ff8c
+sources
+
+# ╔═╡ 4ec7e98e-c183-4c51-ac6b-4c79495eac67
+begin
+electricₜ = CSV.read(joinpath(input_dir, "training_electric.csv"), DataFrame);
+gasₜ = CSV.read(joinpath(input_dir, "training_gas.csv"), DataFrame);
+end;
+
+# ╔═╡ 113966ec-2c5f-4778-866e-5d0e8f5185f5
+describe(electricₜ, :detailed)[:,["variable","q25","median","q75"]]
+
+# ╔═╡ 37a25f49-0283-4b63-82df-f627cd9b1f92
+skewness(electricₜ.electricity_mwh)
+
+# ╔═╡ 56d7a517-3e32-4ae9-ac9a-11ac6f62f6a8
+describe(gasₜ, :detailed)[:,["variable","q25","median","q75"]]
+
+# ╔═╡ a83ced13-9959-4c9c-8cba-2e136115f7a7
+skewness(gasₜ.naturalgas_mwh)
+
+# ╔═╡ b5852716-bec1-4b41-bb36-1588751ca824
+begin
+# electric
+teₐ′₀ = CSV.read(joinpath(dataout_dir, "tea0.csv"), DataFrame)
+teₐ′₂ = CSV.read(joinpath(dataout_dir, "tea2.csv"), DataFrame)
+teₐ′₃ = CSV.read(joinpath(dataout_dir, "tea3.csv"), DataFrame)
+teₐ′₄ = CSV.read(joinpath(dataout_dir, "tea4.csv"), DataFrame)
+teₐ′₅ = CSV.read(joinpath(dataout_dir, "tea5.csv"), DataFrame)
+teₐ′₆ = CSV.read(joinpath(dataout_dir, "tea6.csv"), DataFrame)
+teₐ′₇ = CSV.read(joinpath(dataout_dir, "tea7.csv"), DataFrame)
+teₐ′₈ = CSV.read(joinpath(dataout_dir, "tea8.csv"), DataFrame)
+teₐ′₉ = CSV.read(joinpath(dataout_dir, "tea9.csv"), DataFrame)
+teₐ′ₑ = CSV.read(joinpath(dataout_dir, "teae.csv"), DataFrame)
+
+# # natural gas
+teᵧ′₀ = CSV.read(joinpath(dataout_dir, "teg0.csv"), DataFrame)
+teᵧ′₂ = CSV.read(joinpath(dataout_dir, "teg2.csv"), DataFrame)
+teᵧ′₃ = CSV.read(joinpath(dataout_dir, "teg3.csv"), DataFrame)
+teᵧ′₄ = CSV.read(joinpath(dataout_dir, "teg4.csv"), DataFrame)
+teᵧ′₅ = CSV.read(joinpath(dataout_dir, "teg5.csv"), DataFrame)
+teᵧ′₆ = CSV.read(joinpath(dataout_dir, "teg6.csv"), DataFrame)
+teᵧ′₇ = CSV.read(joinpath(dataout_dir, "teg7.csv"), DataFrame)
+teᵧ′₈ = CSV.read(joinpath(dataout_dir, "teg8.csv"), DataFrame)
+teᵧ′₉ = CSV.read(joinpath(dataout_dir, "teg9.csv"), DataFrame)
+# teᵧ′ₑ = CSV.read(joinpath(dataout_dir, "tege.csv"), DataFrame)
+end;
+
+# ╔═╡ a9a616b6-b121-4f84-9261-d3465466ba02
+teₐ′₅
+
+# ╔═╡ 9289932b-2af7-4991-971f-96f6ef395b14
+begin
+test_terms = [teₐ′₀,teₐ′₂,teₐ′₃,teₐ′₄,teₐ′₅,teₐ′₆,teₐ′₇,teₐ′₈,teₐ′₉];
+resultsₑ = vcat([ DataFrames.select(x, common_terms) for x in test_terms ]...);
+resultsₑ.diff = errfunc.(resultsₑ.prediction .- resultsₑ.recorded);
+resultsₑ.fuel = repeat(["Electricity"], nrow(resultsₑ))
+resultsₑ
+end;
+
+# ╔═╡ 4efca97a-34f4-41dd-bd76-3ffed4262d28
+null_namesₑ = names(test_terms[1])
+
+# ╔═╡ c1587eef-ec3e-42d1-ab0b-c5d8a395e5cd
+begin
+dataset_namesₑ = Dict()
+null_terms = filter( x -> ~occursin(r"_f.", x), names(test_terms[1]))
+push!(dataset_namesₑ, "Null" => length(null_terms))
+
+for terms in test_terms
+	term_names = filter( x -> occursin(r"_f.", x), names(terms))
+	model_name = terms.model[1]
+	for name in term_names
+		push!(dataset_namesₑ, model_name => length(term_names))
+	end
+end
+dataset_namesₑ
+end
+
+# ╔═╡ 9679fec5-be9b-4fa8-a699-b18f0ada44b9
+unique(resultsₑ.date)
+
+# ╔═╡ 94a4b152-683f-450b-8016-1a3252b8ec56
+begin
+test_termsᵧ = [teᵧ′₀,teᵧ′₂,teᵧ′₃,teᵧ′₄,teᵧ′₅,teᵧ′₆,teᵧ′₇,teᵧ′₈,teᵧ′₉];
+resultsᵧ = vcat([ DataFrames.select(x, common_terms) for x in test_termsᵧ ]...);
+resultsᵧ.diff = errfunc.(resultsᵧ.prediction .- resultsᵧ.recorded);
+resultsᵧ.fuel = repeat(["Natural Gas"], nrow(resultsᵧ))
+resultsᵧ
+end;
+
+# ╔═╡ 75a9d962-54bd-498d-a513-035e9a225eff
+results = vcat(resultsₑ, resultsᵧ);
+
+# ╔═╡ 9a3fbbb9-0520-4a04-841e-e960928212b2
+landsat = CSV.read(joinpath(data_path, "p2_o", "landsat8.csv"), DataFrame; dateformat="yyyy-mm-dd HH:MM:SS")
+
+# ╔═╡ 5a07ce6a-4e09-4983-b0d6-c1a3e9d1d980
+dropmissing!(landsat)
+
+# ╔═╡ b1ffd85f-9e55-4b62-bfe5-6811744ca72b
+landsat_dates = sort(unique(landsat.date))
+
+# ╔═╡ d2381a47-019d-45df-ab7f-6b18f92ccd54
+month_samples = values(countmap(Dates.Date.(Dates.Year.(landsat_dates), Dates.Month.(landsat_dates))))
+
+# ╔═╡ 0c3cb738-f14a-4c3f-9a0a-af3bd1e6e585
+mean(month_samples)
+
+# ╔═╡ 19897c1b-8c2a-4ce8-a66e-8522591137b0
+landsat_datediff = filter( x -> x >0, Dates.days.((landsat_dates[2:end] .- landsat_dates[1:end-1])))
+
+# ╔═╡ 30c94fe5-fc8d-4ea1-8f0e-9f558905bb5c
+Gadfly.plot(
+	x=landsat_datediff,
+	Geom.histogram,
+	Theme(default_color="black")
+)
+
+# ╔═╡ de81a406-6215-4396-9052-e4c9cb460351
+median(landsat_datediff)
+
+# ╔═╡ 2126d3c7-f73b-42b3-a8cd-9fad2f548786
+landsat_dates[2]
+
+# ╔═╡ 0f5c1310-84bb-491e-ac56-dde86b363a42
+landsat_dates[1]
+
+# ╔═╡ d3367231-3be3-4853-8639-04444ee32614
+sort(unique(landsat.date))
+
+# ╔═╡ ed4e75e7-14a0-41e4-81bf-56d5766135cc
+function realnames(x)
+	rename(x, :fuel => "\\textbf{Energy Class}", :cvrmse => "\\textbf{CV(RMSE)}", :nmbe => "\\textbf{NMBE}", :cvstd => "\\textbf{CV(STD)}", :rmse => "\\textbf{RMSE}", :model => "\\textbf{Model}", :mae => "\\textbf{MAE}")
+end
+
 # ╔═╡ 14a12712-0dce-46ad-9e9b-57462d24b58d
 md"""
 Aggregated Building UBEM metrics
@@ -156,11 +274,23 @@ Aggregated Building UBEM metrics
 ## graphical approach
 
 # ╔═╡ 7288df95-22a7-423b-8821-f5d14742c1a3
-results_agg = combine(groupby(results, ["model","month","zone","fuel"]), :diff => median, renamecols=false)
+results_agg = combine(groupby(results, ["model","month","zone","fuel"]), :diff => mean, renamecols=false);
+
+# ╔═╡ 8266db80-4cd2-4f94-95f3-77792d149a9c
+grouped_results = groupby(results, ["model","month","zone","fuel"]);
+
+# ╔═╡ 80849026-8a25-48b0-8909-fea0aca1c712
+results
+
+# ╔═╡ b2215e09-a68e-453b-943b-76568faca5c1
+sort(results_agg, [:fuel, :diff, :month])
+
+# ╔═╡ eb9acb6d-2068-4681-8088-f7cb401f2682
+sort(results_agg, [:fuel, :month, :zone, :diff])
 
 # ╔═╡ 281893d0-4cc9-47c5-ae8b-468f2fcac2d2
 r₁ = Gadfly.plot(
-	results_agg,
+	sort(results_agg, [:fuel, :month, :zone, :model]),
 	x=:month,
 	y=:model,
 	xgroup=:fuel,
@@ -169,15 +299,64 @@ r₁ = Gadfly.plot(
 	Geom.subplot_grid(
 		Geom.rectbin,
 		Guide.xticks(ticks=1:12)
-	)
+	),
+	Scale.ContinuousColorScale(
+		palette -> get(ColorSchemes.curl, palette),
+		minvalue=0,
+		maxvalue=100
+	),
+	Guide.title("Mean Absolute Error by Month, Model, and Building Class"),
+	Guide.colorkey(title="MAE")
 )
+
+# ╔═╡ 480c9afb-1103-427b-b534-7df2e60bb8f8
+
+
+# ╔═╡ e88ed963-0ca0-4dc2-a475-3acb775f26ba
+latexify(
+	rename(select(unstack(filter(x -> x.zone == "Commercial" && x.fuel == "Electricity", sort(results_agg, :month)), :month, :diff), Not([:zone, :fuel])), :model => Symbol("\\textbf{Model}")),
+	latex= false, fmt = FancyNumberFormatter(3), env=:table
+)
+
+# ╔═╡ fd8ad0e7-2610-4021-a0cc-b735c10a2e6a
+latexify(
+	rename(select(unstack(filter(x -> x.zone == "Manufacturing" && x.fuel == "Electricity", sort(results_agg, :month)), :month, :diff), Not([:zone, :fuel])), :model => Symbol("\\textbf{Model}")),
+	latex= false, fmt = FancyNumberFormatter(3), env=:table
+)
+
+# ╔═╡ 679c5199-a2be-47cc-aefd-1fbcd3ec7126
+latexify(
+	rename(select(unstack(filter(x -> x.zone == "Residential" && x.fuel == "Electricity", sort(results_agg, :month)), :month, :diff), Not([:zone, :fuel])), :model => Symbol("\\textbf{Model}")),
+	latex= false, fmt = FancyNumberFormatter(3), env=:table
+)
+
+# ╔═╡ c38e9b9a-7396-41f3-adf3-e3dd01ec6b19
+latexify(
+	rename(select(unstack(filter(x -> x.zone == "Commercial" && x.fuel == "Natural Gas", sort(results_agg, :month)), :month, :diff), Not([:zone, :fuel])), :model => Symbol("\\textbf{Model}")),
+	latex= false, fmt = FancyNumberFormatter(3), env=:table
+)
+
+# ╔═╡ 94baa87b-0efa-46be-8ee7-1a9e4a568c37
+latexify(
+	rename(select(unstack(filter(x -> x.zone == "Manufacturing" && x.fuel == "Natural Gas", sort(results_agg, :month)), :month, :diff), Not([:zone, :fuel])), :model => Symbol("\\textbf{Model}")),
+	latex= false, fmt = FancyNumberFormatter(3), env=:table
+)
+
+# ╔═╡ a86368bb-6c18-4c58-afbc-6e5e1737b887
+latexify(
+	rename(select(unstack(filter(x -> x.zone == "Residential" && x.fuel == "Natural Gas", sort(results_agg, :month)), :month, :diff), Not([:zone, :fuel])), :model => Symbol("\\textbf{Model}")),
+	latex= false, fmt = FancyNumberFormatter(3), env=:table
+)
+
+# ╔═╡ 02a34094-e86c-482e-9fed-23001400a943
+
 
 # ╔═╡ ac759b4b-aa8a-4645-ba37-d2a3e7c9b5be
 draw(
 	PNG(
 		joinpath(output_dir, "aggregation_results.png"), 
-		20cm, 
-		12cm,
+		18cm, 
+		16cm,
 		dpi=500
 	), r₁
 )
@@ -190,12 +369,21 @@ results_agg_comparison = leftjoin(
 	on=["month","zone","fuel"],
 	makeunique=true
 )
-results_agg_comparison.improvement = (results_agg_comparison.diff .- results_agg_comparison.diff_1 ) ./ results_agg_comparison.diff_1
+results_agg_comparison.improvement = 100 .* (results_agg_comparison.diff .- results_agg_comparison.diff_1 ) ./ results_agg_comparison.diff_1
+
+results_agg_comparison.improvement = clamp.(results_agg_comparison.improvement, -Inf, 0)
 end;
+
+# ╔═╡ 09f74c7d-5ee3-4529-ae5f-ae2392de44de
+sort(results_agg_comparison, [:fuel, :improvement])
+
+# ╔═╡ de070df7-7dd2-4a97-a87b-33170144b896
+sort(results_agg_comparison, [:fuel,:improvement])
 
 # ╔═╡ 43a58ec0-95c3-4a9e-9106-c618284116b8
 r₂ = Gadfly.plot(
-	results_agg_comparison,
+	# filter(x -> x.model ∈ ["EPW","NOAA","CMIP","Landsat8","Sentinel-2"],
+	sort(results_agg_comparison, [:fuel,:improvement], rev=true),
 	x=:month,
 	y=:model,
 	xgroup=:fuel,
@@ -204,7 +392,24 @@ r₂ = Gadfly.plot(
 	Geom.subplot_grid(
 		Geom.rectbin,
 		Guide.xticks(ticks=1:12)
-	)
+	),
+	Guide.colorkey(title="Δ"),
+	Scale.ContinuousColorScale(
+		palette -> get(ColorSchemes.Greens, palette),
+	),
+	# Scale.ygroup(
+	# 	order=[
+	# 		"SAR",
+	# 		"VIIRS",
+	# 		"Dynamic World",
+	# 		"Sentinel-2",
+	# 		"Landsat8",
+	# 		"NOAA",
+	# 		"CMIP",
+	# 		"EPW",
+	# 		"Null"
+	# 	]
+	# )
 )
 
 # ╔═╡ 4726c365-0295-4816-a86e-6dbafedcc003
@@ -219,19 +424,50 @@ draw(
 
 # ╔═╡ c9b841da-1974-467d-b360-40118082cb19
 md"""
-#### Hypothesis 1 
+#### RQ 1 
 Weather Station Distance
 """
 
 # ╔═╡ d7fabb28-8d25-46b9-8348-146c54c4ea8e
 begin
-meter_resolution = 500
+meter_resolution = 750
 results_metadata = filter(x-> x.model ∈ ["EPW","NOAA","Landsat8"], results);
 results_metadata.distance_bucket = (results_metadata.weather_station_distance .- (results_metadata.weather_station_distance .% meter_resolution)) ./ 1000;
 
 results_metadata.area_bucket = results_metadata.area .- (results_metadata.area .% 2500);
 results_metadata.heightroof_bucket = results_metadata.heightroof .- (results_metadata.heightroof .% 100);
 end;
+
+# ╔═╡ 19d528ac-b099-4e9d-8037-b98cb39c731d
+epw_results = filter(x -> x.model == "EPW", select(results, ["Property Id", "date", "model", "diff", "weather_station_distance","fuel"]))
+
+# ╔═╡ 02dac397-1a6e-4523-9016-d7db811555cb
+group_results = filter(x -> x.model ∈ ["Landsat8","NOAA"], select(results, ["Property Id", "date", "model", "diff","fuel"]))
+
+# ╔═╡ 0531d20a-929d-4f0e-a999-5a5fba5a66d2
+begin
+resso = leftjoin(
+	group_results,
+	epw_results,
+	on=["Property Id","date","fuel"],
+	makeunique=true
+)
+resso.improvement = 100 .* (resso.diff .- resso.diff_1) ./ resso.diff_1
+resso
+end
+
+# ╔═╡ 5b8c6173-11ee-4484-910f-1aec2e756ab6
+# Gadfly.plot(
+# 	resso,
+# 	x=:weather_station_distance,
+# 	y=:improvement,
+# 	color=:model,
+# 	ygroup=:fuel,
+# 	Geom.subplot_grid(
+# 		Geom.smooth(smoothing=0.1),
+# 		Guide.xrug
+# 	)
+# )
 
 # ╔═╡ 99b00d40-b112-40b5-af21-19f762c7bf99
 rectbin_results = combine(groupby(results_metadata, [:area_bucket, :distance_bucket, :fuel, :heightroof_bucket]), :diff => mean, renamecols=false);
@@ -247,81 +483,74 @@ baseline_comparison = leftjoin(
 	on=["distance_bucket","fuel"],
 	makeunique=true
 )
-baseline_comparison.improvement = 100 .* ( baseline_comparison.diff .- baseline_comparison.diff_1 ) ./ baseline_comparison.diff_1
+
+baseline_comparison.random_dist = baseline_comparison.distance_bucket .+ (rand(nrow(baseline_comparison)) .- 0.5)
+baseline_comparison.improvement = 100 .* (baseline_comparison.diff .- baseline_comparison.diff_1 ) ./ baseline_comparison.diff_1
 end;
+
+# ╔═╡ d04db8e6-784d-40c0-87dd-f42638c6fe89
+baseline_comparison.distance_bucket
+
+# ╔═╡ 0985c9d2-6705-4682-9d31-67f05dc8f81b
+baseline_comparison.random_dist
+
+# ╔═╡ 9ead69f4-4ce6-49e3-835f-47c88793a5c9
+histogram(filter(x -> x.model == "Landsat8", baseline_comparison).improvement, bins=20)
 
 # ╔═╡ 380a19ab-8219-45fe-aeff-6eba347c6806
 results_epwdistance = Gadfly.plot(
-	baseline_comparison,
+	filter(x -> x.model != "EPW", baseline_comparison),
 	x=:distance_bucket,
 	y=:improvement,
+	yintercept=[0],
 	y_group=:fuel,
+	# x_group=:model,
 	color=:model,
 	Geom.subplot_grid(
-		# Geom.point,
+		Geom.point,
 		# Geom.hair,
-		# Geom.smooth(smoothing=0.7),
-		Geom.smooth(smoothing=0.1),
-		Guide.xticks(ticks=collect(0:2.5:22.5)),
+		Geom.smooth(smoothing=0.5),
+		# Geom.line,
+		# Geom.step,
+		# Geom.smooth(smoothing=0.4),
+		# Geom.line,
+		Guide.xticks(ticks=collect(0:5:20)),
+		# Guide.xrug,
+		Guide.yticks(ticks=-20:15:30),
+		Geom.hline(color="pink"),
 		# Coord.cartesian(ymin=25, ymax=75),
+		free_y_axis=true
 	),
 	Theme(
-		point_size=1.5pt,
+		point_size=1.75pt,
+		line_width=1.0pt,
 		key_position=:bottom, 
-		default_color="black",
-		highlight_width=0.3pt,
-		# alphas=[0.3]
+		default_color="gray",
+		major_label_font_size=12pt,
+		minor_label_font_size=10pt,
+		# highlight_width=0.5pt,
+		alphas=[0.7]
+		# color=[colorant"black", colorant"red"]
 	),
 	Guide.colorkey(title="Model"),
 	Guide.xlabel("Distance to Weather Station (km)"),
 	Guide.ylabel("Percent Difference MAE"),
-	# Scale.color_discrete_manual(
-	# 	colorant"lightcoral",
-	# 	colorant"dodgerblue"
-	# ),
+	Scale.color_discrete_manual(
+		colorant"#FF483B",
+		colorant"#83B592"
+	),
 	# Scale.y_log,
-	Guide.title("EPW Predictions vs Distance (km)")
+	Guide.title("Prediction Error Relative to EPW (%) vs Distance")
 )
 
 # ╔═╡ 299d1227-6803-4f32-aa05-65b73817c3e3
 draw(
 	PNG(
-		joinpath(output_dir, "distance_error_epw_1.png"), 
-		18cm, 
-		12cm,
+		joinpath(output_dir, "distance_error_epw.png"), 
+		13cm, 
+		10cm,
 		dpi=500
 	), results_epwdistance
-)
-
-# ╔═╡ d70d5d64-353e-4b3d-9b07-52b08340321b
-distance_error = Gadfly.plot(
-	rectbin_results,
-	x=:distance_bucket,
-	y=:area_bucket,
-	ygroup=:fuel,
-	color=:diff,
-	Geom.subplot_grid(
-		Geom.rectbin,
-		Guide.xticks(ticks=collect(0:5:22.5)),
-		Guide.yticks(ticks=collect(0:0.5e4:3.0e4))		
-	),
-	Scale.ContinuousColorScale(
-		palette -> get(ColorSchemes.matter, palette),
-	),
-	Guide.colorkey(title="MAE"),
-	Guide.xlabel("Distance (kmm)"),
-	Guide.ylabel("Total Floor Area (m²)"),
-	Guide.title("EPW Model Average MAE vs. Distance and Area")
-)
-
-# ╔═╡ 8d521022-37a1-4229-b2c0-96d36528dcea
-draw(
-	PNG(
-		joinpath(output_dir, "distance_error_epw_4.png"), 
-		15cm, 
-		15cm,
-		dpi=500
-	), distance_error
 )
 
 # ╔═╡ 3527d303-01ae-4b41-a4f5-f0cad5dba29c
@@ -359,36 +588,36 @@ begin
 end;
 
 # ╔═╡ 2d6815ea-762f-4ff4-a632-715653c0c89a
-p₄ = Gadfly.plot(
-	filter(x->x.model ∈ ["Null","EPW","Landsat8"], Ξ′),
-	x=:month,
-	y=:diff,
-	color=:color,
-	xgroup=:model,
-	ygroup=:fuel,
-	yintercept=[0],
-	Guide.ylabel("Δ Prediction - Recorded"),
-	Guide.xlabel("Month"),
-	Guide.title("Mean Electricity Error by Season"),
-	Guide.colorkey(title="Season"),
-	Geom.subplot_grid(
-		# Guide.yticks(ticks=0.0:0.001:0.01),
-		Guide.xticks(ticks=1:2:12),
-		# Geom.hair,
-		Geom.point,
-		# Geom.line,
-		Geom.hline(color=["pink"], style=:solid),
-		# Geom.point,
-		free_y_axis=true,
-	),	# Coord.cartesian(ymin=-0.1, ymax=0.1, aspect_ratio=1.5),
-	Theme(key_position = :bottom),
-	# Scale.color_discrete_manual(
-	# 	colorant"skyblue",
-	# 	colorant"lightgreen",
-	# 	colorant"indianred",
-	# 	colorant"coral"
-	# ),
-)
+# p₄ = Gadfly.plot(
+# 	filter(x->x.model ∈ ["Null","EPW","Landsat8"], Ξ′),
+# 	x=:month,
+# 	y=:diff,
+# 	color=:color,
+# 	xgroup=:model,
+# 	ygroup=:fuel,
+# 	yintercept=[0],
+# 	Guide.ylabel("Δ Prediction - Recorded"),
+# 	Guide.xlabel("Month"),
+# 	Guide.title("Mean Electricity Error by Season"),
+# 	Guide.colorkey(title="Season"),
+# 	Geom.subplot_grid(
+# 		# Guide.yticks(ticks=0.0:0.001:0.01),
+# 		Guide.xticks(ticks=1:2:12),
+# 		# Geom.hair,
+# 		Geom.point,
+# 		# Geom.line,
+# 		Geom.hline(color=["pink"], style=:solid),
+# 		# Geom.point,
+# 		free_y_axis=true,
+# 	),	# Coord.cartesian(ymin=-0.1, ymax=0.1, aspect_ratio=1.5),
+# 	Theme(key_position = :bottom),
+# 	# Scale.color_discrete_manual(
+# 	# 	colorant"skyblue",
+# 	# 	colorant"lightgreen",
+# 	# 	colorant"indianred",
+# 	# 	colorant"coral"
+# 	# ),
+# )
 
 # ╔═╡ 7980fbcd-9e53-481f-95ed-18818ecf0c49
 begin
@@ -399,24 +628,27 @@ epw_comparison = leftjoin(
 	makeunique=true
 )
 epw_comparison.improvement = 100 .* ( epw_comparison.diff_1 .- epw_comparison.diff ) ./ epw_comparison.diff
+
+epw_comparison.improvement = clamp.(epw_comparison.improvement, -Inf, 0)
 end;
 
 # ╔═╡ aa8dcf2e-6776-403a-abcf-9dee17839c8f
-Gadfly.plot(
-	filter(x->x.model_1 ∈ ["EPW","Landsat8","NOAA"], epw_comparison),
+p₄ = Gadfly.plot(
+	filter(x->x.model_1 ∈ ["Landsat8","NOAA"], epw_comparison),
 	x=:month,
 	y=:improvement,
 	color=:color_1,
 	xgroup=:model_1,
 	ygroup=:fuel,
 	yintercept=[0],
-	Guide.ylabel("Δ Prediction - Recorded"),
-	Guide.xlabel("Month"),
-	Guide.title("Mean Electricity Error by Season"),
+	Guide.ylabel("Percent Difference to EPW - MAE"),
+	Guide.xlabel("Months by Model"),
+	Guide.title("Relative Benefits to EPW by Season - MAE"),
 	Guide.colorkey(title="Season"),
 	Geom.subplot_grid(
 		# Guide.yticks(ticks=0.0:0.001:0.01),
-		Guide.xticks(ticks=1:1:12),
+		Guide.xticks(ticks=1:2:12),
+		Guide.yticks(ticks=-10:2.5:0),
 		Geom.hair,
 		Geom.point,
 		# Geom.line,
@@ -424,36 +656,47 @@ Gadfly.plot(
 		# Geom.point,
 		# free_y_axis=true,
 	),	# Coord.cartesian(ymin=-0.1, ymax=0.1, aspect_ratio=1.5),
-	Theme(key_position = :bottom, point_size=2pt),
-	# Scale.color_discrete_manual(
-	# 	colorant"skyblue",
-	# 	colorant"lightgreen",
-	# 	colorant"indianred",
-	# 	colorant"coral"
-	# ),
+	Theme(
+		key_position = :bottom,
+		line_width=1.7pt,
+		point_size=3.0pt,
+		# minor_label_font_size,
+		major_label_font_size=12pt,
+		minor_label_font_size=10pt
+	),
+	Scale.color_discrete_manual(
+		colorant"#55134E",
+		colorant"#12817B",
+		colorant"#FF483B",
+		colorant"#83B592"
+	),
 )
 
 # ╔═╡ f193ade3-9ed2-493d-b97f-cdeb919acaeb
 draw(
 	PNG(
 		joinpath(output_dir, "seasonality_benefits.png"), 
-		18cm, 
-		15cm,
+		12cm, 
+		12cm,
 		dpi=500
 	), p₄
 )
 
+# ╔═╡ 575b3d7d-2484-4eb0-9f4d-720c3c550dae
+mae
+
 # ╔═╡ fdcef3ad-2692-4de2-b578-e30acf11842e
 begin
-function aggregation_results(individual_results)
-	ṫ = combine(groupby(individual_results, ["date","zipcode","fuel","model"]), [:prediction, :recorded] .=> sum, nrow => :count,  renamecols=false)
+function aggregation_results(individual_results, aggterms = ["date","zipcode","fuel","model"])
+	ṫ = combine(groupby(individual_results, aggterms), [:prediction, :recorded] .=> sum, nrow => :count,  renamecols=false)
 	
-	res = combine(groupby(ṫ, ["zipcode","fuel","model"])) do vᵢ
+	res = combine(groupby(ṫ, filter( x -> x ≠ "date", aggterms))) do vᵢ
 		(
 		cvrmse = cvrmse(vᵢ.prediction, vᵢ.recorded),
 		nmbe = nmbe(vᵢ.prediction, vᵢ.recorded),
 		cvstd = cvstd(vᵢ.prediction, vᵢ.recorded),
 		rmse = rmse(vᵢ.prediction, vᵢ.recorded),
+		mae = mae(vᵢ.prediction, vᵢ.recorded),
 		model = first(vᵢ.model),
 		count = first(vᵢ.count)
 		)
@@ -470,18 +713,44 @@ end
 # ╔═╡ 2808cc24-c3bb-4b69-bc4d-8503c1503a46
 begin
 res, aggresults = aggregation_results(results);
-aggresults
+res.random_count = res.count .+ rand(nrow(res))
+	
+sort(aggresults, [:fuel, :rmse])
 end
+
+# ╔═╡ 2eb802aa-a9da-4f7e-8ca5-d3897c5e2874
+resultsₐ = realnames(sort(select(aggresults, [:fuel, :model, :cvrmse, :nmbe, :mae], :), [:fuel, :cvrmse]))
+
+# ╔═╡ 01ecc218-b2e6-4fec-8c7c-5898d20f769e
+resultsₐ
+
+# ╔═╡ 94769e0b-6649-4ba5-87e3-e4dd7603423e
+resultsₐ
+
+# ╔═╡ 33ce90bf-5c8e-496a-b7a4-514f1550989a
+latexify(resultsₐ, latex=false, fmt = FancyNumberFormatter(4), env=:table)
+
+# ╔═╡ 3322ff22-f2cd-467e-929a-238186ab7184
+percentile(unique(select(res, [:zipcode, :count]), :zipcode).count, 75)
+
+# ╔═╡ 9a0f2fb6-372a-4658-be76-d9562f478f31
+begin
+resᵪ, aggresultsᵪ = aggregation_results(results, ["date","zipcode","fuel","model","zone"]);
+end
+
+# ╔═╡ cbd5410b-5d3e-41aa-9c63-7d089617f54a
+aggresultsᵪ
 
 # ╔═╡ 4b6e88dc-82e1-43d7-a92a-6b3a5b01f01d
 begin
-function individual_results(df)
-	res = combine(groupby(df, ["fuel","model"])) do vᵢ
+function individual_results(df, aggterms = ["fuel","model"])
+	res = combine(groupby(df, aggterms)) do vᵢ
 		(
 		cvrmse = cvrmse(vᵢ.prediction, vᵢ.recorded),
 		nmbe = nmbe(vᵢ.prediction, vᵢ.recorded),
 		cvstd = cvstd(vᵢ.prediction, vᵢ.recorded),
 		rmse = rmse(vᵢ.prediction, vᵢ.recorded),
+		mae = mae(vᵢ.prediction, vᵢ.recorded),
 		model = first(vᵢ.model)
 		)
 		end
@@ -491,7 +760,16 @@ end
 end
 
 # ╔═╡ 81af87a5-aba3-4c14-a2ec-57e49af69066
-individual_results(results)
+resultsᵢ = realnames(sort(select(individual_results(results), [:fuel, :model, :cvrmse, :nmbe, :mae], :), [:fuel, :rmse]))
+
+# ╔═╡ 4936a25d-90a9-44f7-8213-0831b47b5953
+latexify(resultsᵢ, latex=false, fmt = FancyNumberFormatter(4), env=:table)
+
+# ╔═╡ 9172ed67-695c-4818-90d0-ee5e3104feae
+resultsᵪᵢ = rename(realnames(sort(individual_results(results, ["fuel","zone","model"]), [:fuel,:zone,:cvrmse])), :zone => "\\textbf{Zone}")
+
+# ╔═╡ 08d901c6-f7ce-4070-b41c-ec3661868861
+latexify(resultsᵪᵢ, latex=false, fmt = FancyNumberFormatter(4), env=:table)
 
 # ╔═╡ edc350d5-e505-4487-a4a6-cfb680711ac1
 begin
@@ -536,6 +814,22 @@ md"""
 Aggregated Benefits
 """
 
+# ╔═╡ f5482c86-da26-4b37-bd22-78367726ccb6
+combine(groupby(res, [:fuel, :model]), :cvrmse => median)
+
+# ╔═╡ 5516e2ca-abc9-47fe-89b3-57ff36b003c6
+median(filter(x -> x < 300, res.cvrmse))
+
+# ╔═╡ a06bf7f0-b234-4a59-a92b-18be3cfb8f10
+Gadfly.plot(
+	x=filter(x -> x < 300, res.cvrmse),
+	Guide.xticks(ticks=0:25:300),
+	Geom.histogram,
+	Guide.title("Histogram of CVRMSE scores"),
+	Guide.ylabel("Count of Buildings"),
+	Guide.xlabel("CV(RMSE)")
+)
+
 # ╔═╡ a9e93d79-b97b-4fc1-9304-2a5f3ec2f4bf
 begin
 modelchoice = ["EPW","Landsat8","NOAA"]
@@ -543,8 +837,8 @@ scalingplot = Gadfly.plot(
 	stack(
 		filter(x -> x.model ∈ modelchoice && x.count > 2, 
 			res
-		), [:cvrmse, :nmbe, :cvstd, :rmse]),
-	x=:count,
+		), [:cvrmse, :nmbe, :rmse]), #:cvstd, :rmse
+	x=:random_count,
 	y=:value,
 	color=:model,
 	yintercept=[0],
@@ -552,26 +846,33 @@ scalingplot = Gadfly.plot(
 	# xgroup=:fuel,
 	Geom.subplot_grid(
 		# Geom.point,
-		Geom.smooth(smoothing=0.75),
+		Geom.smooth,
 		# Geom.smooth(smoothing=0.5, color="red"),
 		Geom.hline(color="pink"),
-		# Guide.xrug,
+		Guide.xrug,
 		Guide.xticks(ticks=collect(0:5:40), label=true),
 		free_y_axis=true
 	),
 	# Scale.x_log,
 	Guide.title("Metric Scaling Behavior"),
-	# Guide.xlabel(""),
+	Guide.xlabel("Number of Buildings"),
+	Guide.ylabel("Error Metric"),
 	# Scale.x_log,
 	Theme(
-		line_width=1.5pt,
-		rug_size=7pt,
+		line_width=1.2pt,
+		# rug_size=8pt,
 		point_size=0.5pt,
-		alphas=[0.3],
-		default_color="black", 
+		# alphas=[0.3],
+		default_color="gray", 
 		highlight_width = 0pt,
-		key_position=:bottom
-	)
+		key_position=:bottom,
+	),
+	Scale.color_discrete_manual(
+		# colorant"#55134E",
+		colorant"#12817B",
+		colorant"#FF483B",
+		colorant"#83B592"
+	),
 )
 end
 
@@ -580,9 +881,266 @@ draw(
 	PNG(
 		joinpath(output_dir, "scaling-behavior.png"), 
 		12cm, 
-		25cm,
+		20cm,
 		dpi=500
 	), scalingplot
+)
+
+# ╔═╡ b65ab7f0-ab57-4e8a-813f-87d54c77f60d
+md"""
+###### temperature and error
+"""
+
+# ╔═╡ c0073981-495d-4352-b745-04511d02d5fd
+resultsₜ = filter(x-> x.model ∈ ["EPW","Landsat8"], results);
+
+# ╔═╡ 06228a5c-7bd5-41f4-910e-aca4ee21fbd1
+begin
+tₑ = select(teₐ′₅, Not(:electricity_mwh))
+tₑ.fuel = repeat(["Electricity"], nrow(tₑ))
+
+tᵧ = select(teᵧ′₆, Not(:naturalgas_mwh))
+tᵧ.fuel = repeat(["Natural Gas"], nrow(tᵧ))
+	
+landsat_predictions = vcat(
+	tₑ,
+	tᵧ
+)
+landsat_predictions.diff = abs.(landsat_predictions.prediction .- landsat_predictions.recorded)
+
+landsat_predictions.temperature_bucket = (landsat_predictions.ST_B10 .- (landsat_predictions.ST_B10 .% 2.5));
+
+temperature_estimates = combine(groupby(landsat_predictions, [:fuel, :temperature_bucket]), 
+	:diff => (x -> quantile(x, 0.25)) => :q25,
+	:diff => median => :q50,
+	:diff => (x -> quantile(x, 0.75)) => :q75,
+	:diff => (x -> length(x) / 50) => :nrow,
+	:diff => (x -> 0.0) => :zeroterms
+);end
+
+# ╔═╡ 1c68d5f7-fab6-4564-8184-106a2abf39e4
+tₑ
+
+# ╔═╡ f7de4fc1-5ba5-431e-808f-50b89b346bba
+lsample = landsat_predictions[sample(1:nrow(landsat_predictions), 1000),:];
+
+# ╔═╡ ce34731a-cf8f-4e17-b721-82cefd53e859
+maximum(temperature_estimates.q75)
+
+# ╔═╡ 771a46a8-bc0f-4582-afea-6e481704b95a
+t₀ = Gadfly.plot(
+	temperature_estimates,
+	x=:temperature_bucket,
+	y=:nrow,
+	Geom.bar,
+	# Scale.y_log,
+	Guide.xticks(ticks=-15:5:55, label=false),
+	# Guide.yticks(label=false),
+	# Guide.yticks(ticks=0:1000:2000),
+	Guide.xlabel(""),
+	Guide.ylabel(""),
+	Theme(default_color="black")
+)
+
+# ╔═╡ f8d68092-ce96-454a-ae36-a6b94673b04f
+t₁ = Gadfly.plot(
+	temperature_estimates,
+	x=:temperature_bucket,
+	y=:q50,
+	ymin=:q25,
+	ymax=:q75,
+	yintercept=[0],
+	xgroup=:fuel,
+	Geom.subplot_grid(
+		# Geom.point,
+		Geom.step,
+		# Geom.smooth(smoothing=0.5),
+		# Guide.xrug,
+		Geom.ribbon,
+		Geom.hline(color="gray"),
+		Guide.xticks(ticks=-15:20:55),
+		# free_y_axis=true,
+			# Guide.yticks(ticks=0:20:100),
+		#Coord.Cartesian(ymin=0, ymax=150),
+	),
+	# Geom.label,
+	# Geom.line,
+	# Guide.xticks(ticks=-15:5:55),
+	# Scale.y_log10,
+	Theme(
+		alphas=[0.5],
+		default_color="black",
+		point_size=2pt,
+		line_width=1pt,
+		major_label_font_size=12pt,
+		minor_label_font_size=10pt,
+	),
+	Guide.xlabel("Landsat8 LST - °C"),
+	Guide.ylabel("Monthly MAE - MWh"),
+	Guide.title("Extreme Temperature Predictions - Error Profile"),
+	Guide.ylabel(""),
+	# Geom.smooth(smoothing=0.5)
+)
+
+# ╔═╡ 298e9181-6f03-4b73-9ebb-2f54adfccf8d
+draw(
+	PNG(
+		joinpath(output_dir, "temperature_error.png"), 
+		12cm, 
+		10cm,
+		dpi=500
+	), t₁
+)
+
+# ╔═╡ 98e438b6-d504-44a9-8fbe-45c9fc19e8c2
+Plots.plot
+
+# ╔═╡ 417470dc-aa97-4b49-b4bb-3e1c54b2f3b5
+teₐ′₂
+
+# ╔═╡ 39ba2144-604c-4be7-a404-ef7af6495fb0
+begin
+ep = copy(teₐ′₂)
+ep.diff = abs.(ep.prediction .- ep.recorded)
+ep.temperature_bucket = (ep.TMP .- (ep.TMP .% 2.5));
+
+ep_estimates = combine(groupby(ep, :temperature_bucket), 
+	:diff => (x -> quantile(x, 0.25)) => :q25,
+	:diff => median => :q50,
+	:diff => (x -> quantile(x, 0.75)) => :q75
+);end
+
+# ╔═╡ 50acba26-503c-431e-b3fe-7e455867531c
+input_dir_environmental = joinpath(data_path, "p2_o")
+
+
+# ╔═╡ 96cfb872-621e-466f-8d04-879dd31bb3a7
+landsat8_p = joinpath(input_dir_environmental, "landsat8.csv")
+
+# ╔═╡ 1485f5a0-be89-4ab9-abce-5f0638aa1c1b
+date_f = "yyyy-mm-dd HH:MM:SS"
+
+# ╔═╡ cf42f453-e140-453f-a348-a11be682f9b7
+begin
+landsat8_r = CSV.read(landsat8_p, DataFrame; dateformat=date_f);
+landsat8_r.ST_B10 = (landsat8_r.ST_B10 .* 0.00341802 .+ 149.0) .- 273.15
+landsat8_r.ST_QA = (landsat8_r.ST_QA .* 0.01) ./ 2
+end
+
+# ╔═╡ f1afa899-4119-42bf-88a5-01c20a58356d
+landsat8_r
+
+# ╔═╡ 103d08f8-4fce-43f0-9f79-6579a07e5f41
+epw_sample = CSV.read(joinpath(data_path, "p1_o", "epw_sample.csv"), DataFrame);
+
+# ╔═╡ 5063fa17-46ad-41d7-8086-83a1b4162e51
+epw_sample
+
+# ╔═╡ b91114dd-908c-463b-9984-8b785f714ab4
+begin
+selected_weather_station = 725053
+single_building = filter( x-> x["Property Id"] == 8841, landsat8_r );
+dropmissing!(single_building, [:ST_B10, :ST_QA])
+
+sample_epw_region = filter( x -> x.weather_station_id == selected_weather_station, epw_sample )
+sample_epw_region.year = Dates.Year.(sample_epw_region.date)
+sample_epw_region.month = Dates.Month.(sample_epw_region.date)
+
+sample_epw_aggregation = combine(groupby(sample_epw_region, [:month, :year]),
+	names(sample_epw_region, Real) .=> mean,
+	renamecols=false
+)
+sample_epw_aggregation.date = Dates.Date.(sample_epw_aggregation.year, sample_epw_aggregation.month)
+sample_epw_aggregation
+end
+
+# ╔═╡ 931144a6-98bc-43db-9a30-2d60d983edbc
+property_map = CSV.read(joinpath(data_path, "p1_o", "property_mapping.csv"), DataFrame);
+
+# ╔═╡ d73ac47f-3eed-4b53-9858-5eef7662ddba
+weatherstation_buildings = filter( x -> x.weather_station_id == selected_weather_station, property_map)[:,"Property Id"]
+
+# ╔═╡ 84cbb29d-d709-48b1-aa92-00cfd1f8686b
+unique(landsat8_r[:,"Property Id"])
+
+# ╔═╡ 3ca311f4-3b93-40f4-bbaf-0eab9562ae60
+sample_sars = sample(MersenneTwister(1), filter( x -> x ∈ weatherstation_buildings, unique(landsat8_r[:,"Property Id"])), 100)
+
+# ╔═╡ 15dfb4bd-e06a-4c17-acd5-52ac3dcaad4f
+begin
+sample_filtered = filter( x-> x["Property Id"] in sample_sars, landsat8_r );
+dropmissing!(sample_filtered, :ST_B10)
+end
+
+# ╔═╡ 56e32a7f-b4ee-48b8-af5e-6bf4799a397e
+temp_profile = Gadfly.plot(
+	Gadfly.layer(
+		single_building,
+		x=:date,
+		y=:ST_B10,
+		ymin=single_building.ST_B10 .- single_building.ST_QA,
+		ymax=single_building.ST_B10 .+ single_building.ST_QA,
+		Geom.point,
+		Geom.errorbar,
+		# Geom.smooth(smoothing=0.1),
+		# Geom.line,
+		# Geom.line,
+		Theme(default_color="lightcoral", line_width=0.7pt, point_size=2pt)
+	),
+	Gadfly.layer(
+		sample_epw_aggregation,
+		x=:date,
+		y=:median_temp,
+		# ymin=:min_temp,
+		# ymax=:max_temp,
+		# Geom.point,
+		Geom.line,
+		Theme(
+			default_color="gray", 
+			line_width=1.1pt, 
+			point_size=2pt, 
+			alphas=[0.8],
+			# Theme(lowlight_color=c->RGBA{Float32}(c.r, c.g, c.b, 0.4))
+		),
+	),
+	Gadfly.layer(
+		sample_filtered,
+		x=:date,
+		y=:ST_B10,
+		color="Property Id",
+		Geom.smooth(smoothing=0.15),
+		Theme(line_width=0.08pt, alphas=[0.2])
+	),
+	Scale.discrete_color_hue,
+	Guide.ylabel("Temperature °C"),
+	Guide.xlabel("Date"),
+	Guide.yticks(ticks=-10:5:50),
+	Guide.xticks(ticks=DateTime("2018-01-1"):Month(1):DateTime("2020-12-31"), orientation=:vertical),
+	Guide.title("Temperature Discrepancies in Manhattan - Landsat8 vs. EPW"),
+	Theme(default_color="black", key_position = :none),
+	Guide.manual_color_key(
+		"Legend", ["Landsat8", "EPW"], ["lightcoral", "gray"]
+	),
+	# Guide.colorkey(pos=:bottom)
+)
+
+# ╔═╡ e9c543ec-997c-48fc-ae4c-565da4a2d062
+Gadfly.plot(
+	sample_filtered,
+	x=:date,
+	y=sample_filtered.ST_URAD ./ sample_filtered.ST_DRAD,
+	color=Symbol("Property Id"),
+	Geom.smooth(smoothing=0.3),
+)
+
+# ╔═╡ ce660527-a38e-4e89-8690-393bc2b07442
+draw(
+	PNG(
+		joinpath(output_dir, "temperature_nonlinearity.png"), 
+		20cm, 
+		10cm,
+		dpi=500
+	), temp_profile
 )
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -591,12 +1149,15 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 Cairo = "159f3aea-2a34-519c-b102-8c37f9878175"
 ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
+Compose = "a81c6b42-2e10-5240-aca2-a61377ecd94b"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 Fontconfig = "186bb1d3-e1f7-5a2c-a377-96d770f13627"
 Gadfly = "c91e804a-d5a3-530f-b6f0-dfbca275c004"
+Latexify = "23fbe1c1-3f47-55db-b15f-69d7ec21a316"
 MLJ = "add582a8-e3ab-11e8-2d5e-e98b27df1bc7"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
@@ -604,11 +1165,13 @@ YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 CSV = "~0.10.9"
 Cairo = "~1.0.5"
 ColorSchemes = "~3.20.0"
+Compose = "~0.9.4"
 DataFrames = "~1.4.4"
 Fontconfig = "~0.4.1"
 Gadfly = "~1.3.4"
+Latexify = "~0.15.18"
 MLJ = "~0.19.1"
-Plots = "~1.38.3"
+Plots = "~1.38.4"
 StatsBase = "~0.33.21"
 YAML = "~0.4.8"
 """
@@ -619,7 +1182,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.8.5"
 manifest_format = "2.0"
-project_hash = "b9d67f345b4bd7cc184352c56677c60e9704cf14"
+project_hash = "c3b1893c2517ba809407f54ac42dc52c950de65a"
 
 [[deps.ARFFFiles]]
 deps = ["CategoricalArrays", "Dates", "Parsers", "Tables"]
@@ -1513,9 +2076,9 @@ version = "1.3.4"
 
 [[deps.Plots]]
 deps = ["Base64", "Contour", "Dates", "Downloads", "FFMPEG", "FixedPointNumbers", "GR", "JLFzf", "JSON", "LaTeXStrings", "Latexify", "LinearAlgebra", "Measures", "NaNMath", "Pkg", "PlotThemes", "PlotUtils", "Preferences", "Printf", "REPL", "Random", "RecipesBase", "RecipesPipeline", "Reexport", "RelocatableFolders", "Requires", "Scratch", "Showoff", "SnoopPrecompile", "SparseArrays", "Statistics", "StatsBase", "UUIDs", "UnicodeFun", "Unzip"]
-git-tree-sha1 = "0a3a23e0c67adf9433111467b0522077c596de58"
+git-tree-sha1 = "87036ff7d1277aa624ce4d211ddd8720116f80bf"
 uuid = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
-version = "1.38.3"
+version = "1.38.4"
 
 [[deps.PooledArrays]]
 deps = ["DataAPI", "Future"]
@@ -2092,55 +2655,146 @@ version = "1.4.1+0"
 # ╠═19b28374-44d1-4554-9bf4-bc452dac1261
 # ╠═f34e8779-809d-4b00-b8fa-7acab4c08322
 # ╠═252aff18-14eb-41c8-a47f-900df098af2c
-# ╠═c721611f-d2c7-4ebf-8ad1-d29a8841cbda
+# ╠═8f159c5f-0994-4f25-bfde-e577bcaa8fe6
 # ╠═3c798c19-8fa9-49fd-bbb8-eb4b22681ce1
 # ╟─db313831-96d4-4cbc-b6f5-1f49f0cff221
-# ╠═5fc39f0b-7678-434d-bd4b-4b1a001891c1
-# ╟─750c5adc-9f84-4a4a-9f8a-b9d347b00a2b
-# ╟─b5852716-bec1-4b41-bb36-1588751ca824
+# ╠═6f9bb8eb-977c-499a-9ee7-d34b58ecc03e
+# ╠═5b27b6a5-140b-41b6-b0d5-208b83c5ff8c
+# ╠═258dc61d-e20e-4ec3-a8c7-feca49515225
+# ╠═750c5adc-9f84-4a4a-9f8a-b9d347b00a2b
+# ╠═4ec7e98e-c183-4c51-ac6b-4c79495eac67
+# ╠═113966ec-2c5f-4778-866e-5d0e8f5185f5
+# ╠═37a25f49-0283-4b63-82df-f627cd9b1f92
+# ╠═56d7a517-3e32-4ae9-ac9a-11ac6f62f6a8
+# ╠═a83ced13-9959-4c9c-8cba-2e136115f7a7
+# ╠═4efca97a-34f4-41dd-bd76-3ffed4262d28
+# ╠═c1587eef-ec3e-42d1-ab0b-c5d8a395e5cd
+# ╠═7299bc57-f7c3-41d5-8a28-49e30799cf93
+# ╠═b5852716-bec1-4b41-bb36-1588751ca824
+# ╠═a9a616b6-b121-4f84-9261-d3465466ba02
+# ╠═0acd8872-98bc-4f2b-960d-d8d449d16407
 # ╠═9462e8e8-5f45-48d2-978c-ff03695cc115
 # ╠═d53007de-27f5-4cbb-9012-cacb281d612b
 # ╠═9289932b-2af7-4991-971f-96f6ef395b14
 # ╠═94a4b152-683f-450b-8016-1a3252b8ec56
+# ╠═9a3fbbb9-0520-4a04-841e-e960928212b2
+# ╠═5a07ce6a-4e09-4983-b0d6-c1a3e9d1d980
+# ╠═b1ffd85f-9e55-4b62-bfe5-6811744ca72b
+# ╠═d2381a47-019d-45df-ab7f-6b18f92ccd54
+# ╠═0c3cb738-f14a-4c3f-9a0a-af3bd1e6e585
+# ╠═90d09570-3eab-4999-bb7b-4b74ccae2f6f
+# ╠═19897c1b-8c2a-4ce8-a66e-8522591137b0
+# ╠═e4b11e6f-bc70-4470-b407-92eb192489ca
+# ╠═30c94fe5-fc8d-4ea1-8f0e-9f558905bb5c
+# ╠═de81a406-6215-4396-9052-e4c9cb460351
+# ╠═2126d3c7-f73b-42b3-a8cd-9fad2f548786
+# ╠═0f5c1310-84bb-491e-ac56-dde86b363a42
+# ╠═d3367231-3be3-4853-8639-04444ee32614
 # ╠═9679fec5-be9b-4fa8-a699-b18f0ada44b9
 # ╠═75a9d962-54bd-498d-a513-035e9a225eff
 # ╠═73d18d6d-b236-4fd4-9981-e70f8c1c37b7
 # ╠═31ea0f25-69d5-4da8-826b-a95e80772375
 # ╠═51fee1ff-78fc-4d5c-950c-5f6158d068b9
 # ╟─7d671ae3-4061-4f8a-a04b-6caed84a2bd9
+# ╠═50c292c1-dcbc-47bb-a545-1ca12a0784fe
+# ╠═ed4e75e7-14a0-41e4-81bf-56d5766135cc
 # ╠═81af87a5-aba3-4c14-a2ec-57e49af69066
+# ╠═9172ed67-695c-4818-90d0-ee5e3104feae
+# ╠═01ecc218-b2e6-4fec-8c7c-5898d20f769e
+# ╠═4936a25d-90a9-44f7-8213-0831b47b5953
+# ╠═08d901c6-f7ce-4070-b41c-ec3661868861
 # ╟─14a12712-0dce-46ad-9e9b-57462d24b58d
 # ╠═2808cc24-c3bb-4b69-bc4d-8503c1503a46
+# ╠═9a0f2fb6-372a-4658-be76-d9562f478f31
+# ╠═cbd5410b-5d3e-41aa-9c63-7d089617f54a
+# ╠═2eb802aa-a9da-4f7e-8ca5-d3897c5e2874
+# ╠═3322ff22-f2cd-467e-929a-238186ab7184
+# ╠═94769e0b-6649-4ba5-87e3-e4dd7603423e
+# ╠═33ce90bf-5c8e-496a-b7a4-514f1550989a
 # ╠═0df2d858-f0a7-4986-876f-f7c7b908051b
 # ╠═7288df95-22a7-423b-8821-f5d14742c1a3
+# ╠═8266db80-4cd2-4f94-95f3-77792d149a9c
+# ╠═80849026-8a25-48b0-8909-fea0aca1c712
+# ╠═b2215e09-a68e-453b-943b-76568faca5c1
+# ╠═eb9acb6d-2068-4681-8088-f7cb401f2682
 # ╠═281893d0-4cc9-47c5-ae8b-468f2fcac2d2
+# ╠═480c9afb-1103-427b-b534-7df2e60bb8f8
+# ╠═e88ed963-0ca0-4dc2-a475-3acb775f26ba
+# ╠═fd8ad0e7-2610-4021-a0cc-b735c10a2e6a
+# ╠═679c5199-a2be-47cc-aefd-1fbcd3ec7126
+# ╠═c38e9b9a-7396-41f3-adf3-e3dd01ec6b19
+# ╠═94baa87b-0efa-46be-8ee7-1a9e4a568c37
+# ╠═a86368bb-6c18-4c58-afbc-6e5e1737b887
+# ╠═02a34094-e86c-482e-9fed-23001400a943
 # ╠═ac759b4b-aa8a-4645-ba37-d2a3e7c9b5be
 # ╠═aa362ebf-f169-4e1c-8434-719393731c2e
+# ╠═09f74c7d-5ee3-4529-ae5f-ae2392de44de
+# ╠═de070df7-7dd2-4a97-a87b-33170144b896
 # ╠═43a58ec0-95c3-4a9e-9106-c618284116b8
 # ╠═4726c365-0295-4816-a86e-6dbafedcc003
-# ╟─c9b841da-1974-467d-b360-40118082cb19
+# ╠═c9b841da-1974-467d-b360-40118082cb19
 # ╠═d7fabb28-8d25-46b9-8348-146c54c4ea8e
+# ╠═19d528ac-b099-4e9d-8037-b98cb39c731d
+# ╠═02dac397-1a6e-4523-9016-d7db811555cb
+# ╠═0531d20a-929d-4f0e-a999-5a5fba5a66d2
+# ╠═5b8c6173-11ee-4484-910f-1aec2e756ab6
 # ╠═99b00d40-b112-40b5-af21-19f762c7bf99
 # ╠═86912ac4-6ad2-420d-a8a0-5680aa1d2c24
+# ╠═d04db8e6-784d-40c0-87dd-f42638c6fe89
+# ╠═0985c9d2-6705-4682-9d31-67f05dc8f81b
 # ╠═95645a95-d129-4ab2-965c-6fd28da6d211
-# ╟─380a19ab-8219-45fe-aeff-6eba347c6806
+# ╠═9ead69f4-4ce6-49e3-835f-47c88793a5c9
+# ╠═380a19ab-8219-45fe-aeff-6eba347c6806
 # ╠═299d1227-6803-4f32-aa05-65b73817c3e3
-# ╟─d70d5d64-353e-4b3d-9b07-52b08340321b
-# ╟─8d521022-37a1-4229-b2c0-96d36528dcea
 # ╟─3527d303-01ae-4b41-a4f5-f0cad5dba29c
 # ╟─a82232c7-4904-435c-ad1c-b797d79232ba
 # ╟─20b0a476-3b73-4893-bc31-c9142b1a2531
 # ╟─470ea684-8977-43ef-aaa0-eab98907b93d
-# ╟─2d6815ea-762f-4ff4-a632-715653c0c89a
-# ╟─7980fbcd-9e53-481f-95ed-18818ecf0c49
-# ╟─aa8dcf2e-6776-403a-abcf-9dee17839c8f
+# ╠═2d6815ea-762f-4ff4-a632-715653c0c89a
+# ╠═7980fbcd-9e53-481f-95ed-18818ecf0c49
+# ╠═aa8dcf2e-6776-403a-abcf-9dee17839c8f
 # ╠═f193ade3-9ed2-493d-b97f-cdeb919acaeb
+# ╠═575b3d7d-2484-4eb0-9f4d-720c3c550dae
 # ╠═fdcef3ad-2692-4de2-b578-e30acf11842e
 # ╠═4b6e88dc-82e1-43d7-a92a-6b3a5b01f01d
 # ╠═edc350d5-e505-4487-a4a6-cfb680711ac1
 # ╟─33f58d0f-bcb6-4528-a10d-548fdf429196
 # ╟─506850d0-30dd-4eba-83fb-42c9a00b37d6
+# ╠═f5482c86-da26-4b37-bd22-78367726ccb6
+# ╠═5516e2ca-abc9-47fe-89b3-57ff36b003c6
+# ╠═a06bf7f0-b234-4a59-a92b-18be3cfb8f10
 # ╠═a9e93d79-b97b-4fc1-9304-2a5f3ec2f4bf
 # ╠═55d0c30f-8253-42c6-a531-66cb18cedd9a
+# ╠═b65ab7f0-ab57-4e8a-813f-87d54c77f60d
+# ╠═c0073981-495d-4352-b745-04511d02d5fd
+# ╠═1c68d5f7-fab6-4564-8184-106a2abf39e4
+# ╠═06228a5c-7bd5-41f4-910e-aca4ee21fbd1
+# ╠═f7de4fc1-5ba5-431e-808f-50b89b346bba
+# ╠═ce34731a-cf8f-4e17-b721-82cefd53e859
+# ╠═771a46a8-bc0f-4582-afea-6e481704b95a
+# ╠═f8d68092-ce96-454a-ae36-a6b94673b04f
+# ╠═298e9181-6f03-4b73-9ebb-2f54adfccf8d
+# ╠═68606de6-932b-48b8-8ea5-b33ee7bf347e
+# ╠═dcda4940-6c1f-45f2-84c5-05ac616e1cc4
+# ╠═98e438b6-d504-44a9-8fbe-45c9fc19e8c2
+# ╠═417470dc-aa97-4b49-b4bb-3e1c54b2f3b5
+# ╠═39ba2144-604c-4be7-a404-ef7af6495fb0
+# ╠═50acba26-503c-431e-b3fe-7e455867531c
+# ╠═96cfb872-621e-466f-8d04-879dd31bb3a7
+# ╠═1485f5a0-be89-4ab9-abce-5f0638aa1c1b
+# ╠═cf42f453-e140-453f-a348-a11be682f9b7
+# ╠═f1afa899-4119-42bf-88a5-01c20a58356d
+# ╠═103d08f8-4fce-43f0-9f79-6579a07e5f41
+# ╠═5063fa17-46ad-41d7-8086-83a1b4162e51
+# ╠═b91114dd-908c-463b-9984-8b785f714ab4
+# ╠═931144a6-98bc-43db-9a30-2d60d983edbc
+# ╠═d73ac47f-3eed-4b53-9858-5eef7662ddba
+# ╠═df01f430-3d39-428e-a74b-24c67c8dbb07
+# ╠═84cbb29d-d709-48b1-aa92-00cfd1f8686b
+# ╠═3ca311f4-3b93-40f4-bbaf-0eab9562ae60
+# ╠═15dfb4bd-e06a-4c17-acd5-52ac3dcaad4f
+# ╠═56e32a7f-b4ee-48b8-af5e-6bf4799a397e
+# ╠═e9c543ec-997c-48fc-ae4c-565da4a2d062
+# ╠═ce660527-a38e-4e89-8690-393bc2b07442
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

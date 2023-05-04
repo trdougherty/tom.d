@@ -628,7 +628,7 @@ nyc_building_points_data
 # Plots.histogram(nyc_council_building_density, bins=20)
 
 # ╔═╡ fa11a171-904f-424b-bb42-25f664fe13e6
-rng = MersenneTwister(120)
+rng = MersenneTwister(1)
 
 # ╔═╡ eb4e2971-8fa4-4d6a-a175-6554c3122a41
 # candidate_councils = rand(1:nrow(nyc_council_counts),6)
@@ -1094,6 +1094,9 @@ now want to make a large dataframe with all of the local weather files found
 # ╔═╡ 0af09aca-8ea7-46c2-a262-795639c295fb
 epw_localfilenames = unique(epw_local.filename)
 
+# ╔═╡ c8fa93b8-df8f-45fb-a512-91ac08b48648
+EnergyPlusWeather.read(joinpath(epw_dir, epw_localfilenames[1])).Date
+
 # ╔═╡ 16275ca0-17ab-42e7-b242-a6a804cd8e4c
 begin
 epw_dataframelist = []
@@ -1116,7 +1119,7 @@ end
 
 # ╔═╡ b6aeff48-f0ce-41fc-8ed7-0552a357bf46
 epw_μ = combine(groupby(
-	filter( x -> x.hour == 15, epw_dataframe), [:weather_station_id, :month, :day]), names(epw_dataframe, Real) .=> median, renamecols=false)
+	filter( x -> x.hour == 11, epw_dataframe), [:weather_station_id, :month, :day]), names(epw_dataframe, Real) .=> median, renamecols=false)
 
 # ╔═╡ 8bd319fc-d76a-4527-b607-944870096343
 epw_M = combine(groupby(filter( x -> x.hour == 15, epw_dataframe), [:weather_station_id, :month, :day]), names(epw_dataframe, Real) .=> maximum, renamecols=false)
@@ -1355,10 +1358,10 @@ sample_size = 6000
 building_classes_plot = Plots.plot(
 	class_centroids[1:sample_size],
 	color_palette = building_class_colors[1:sample_size],
-	markersize=2,
+	markersize=1.5,
 	markerstrokewidth=0,
 	dpi=1000,
-	size=(700,500),
+	size=(500,400),
 	title="Building Classes",
 )
 Plots.plot!(
@@ -1445,40 +1448,69 @@ nyc_monthly_weathermap = leftjoin(
 # select!(nyc_monthly_weathermap, ["Property Id", "weather_station_id", "month", "day"])
 end
 
+
+
 # ╔═╡ 2d70eacf-1793-4fe1-a58e-2f5425cceadc
-centralpark_epw = filter( x -> x.weather_station_id == 725033, epw_dataframe)
+# centralpark_epw = filter( x -> x.weather_station_id == 725033, epw_dataframe)
+
+
 
 # ╔═╡ ba1ab44d-80de-4ea3-9ba2-f4894fef6ade
-select(epw_dataframe, :weather_station_id, :month, :day, :hour, :)
+# select(epw_dataframe, :weather_station_id, :month, :day, :hour, :)
+
+
 
 # ╔═╡ d993a9a6-107c-40f4-a9f7-2672df4d4e2e
 begin
-epw_median_dataframe = combine(
-	groupby(filter( x -> x.hour == 15, epw_dataframe), [:month, :day, :weather_station_id]), 
-	names(epw_dataframe, Real) .=> median, 
-	renamecols=false
+# # begin
+# @info "Current df we want to aggregate" epw_dataframe
+# @info "names of columns" names(epw_dataframe)
+
+gepw = groupby(select(epw_dataframe, Not([:Year, :hour, Symbol("Present Weather Codes"), Symbol("Present Weather Observation"), Symbol("Ceiling Height (m)")])), [:month, :day, :weather_station_id])
+epw_aggregated_dataframe = combine(
+	gepw, 
+	filter( x -> Symbol(x) ∈ valuecols(gepw), names(gepw, Union{Real, Missing}) ) .=> [maximum median minimum],
+	renamecols=true
 );
-# epw_average_dataframe.date = Date.(Dates.Year(2018), Dates.Month.(epw_average_dataframe.month), Dates.Day.(epw_average_dataframe.day))
-# select!(epw_average_dataframe, :date, Not([:month, :day, :hour]))
+# epw_aggregated_dataframe.date = Date.(Dates.Year(2018), Dates.Month.(epw_aggregated_dataframe.month), Dates.Day.(epw_aggregated_dataframe.day))
+# select!(epw_aggregated_dataframe, :date, Not([
+# 	:month, 
+# 	:day,
+# 	r"^Year."
+# ]))
 end;
+
+# ╔═╡ 07c8a2cd-77e6-4fb1-bb79-7959f3e0a514
+filter( x -> Symbol(x) ∈ valuecols(gepw), names(gepw, Union{Real, Missing}) )
+
+# ╔═╡ a82bfb46-86cd-415d-b7e1-234b012cca8e
+valuecols(gepw)
+
+# ╔═╡ e35e8b71-59ad-4bb7-b5b1-19cf6c24258f
+epw_μ
+
+# ╔═╡ 11a9b780-9264-4320-a42a-127a6df9a301
+names(epw_aggregated_dataframe)
 
 # ╔═╡ c9c86e93-0d3d-4b64-b5de-62ca93b90ebb
-begin
-epw_max_dataframe = combine(
-	groupby(filter( x -> x.hour == 15, epw_dataframe), [:month, :day, :weather_station_id]), 
-	names(epw_dataframe, Real) .=> maximum, 
-	renamecols=false
-);
-end;
+# begin
+# epw_max_dataframe = combine(
+# 	groupby(epw_dataframe, [:month, :day, :weather_station_id]), 
+# 	names(epw_dataframe, Real) .=> maximum, 
+# 	renamecols=false
+# );
+# end;
+
+
 
 # ╔═╡ 667f9dea-a073-4a36-ab10-773ec5806af6
-begin
-epw_min_dataframe = combine(
-	groupby(filter( x -> x.hour == 15, epw_dataframe), [:month, :day, :weather_station_id]), 
-	names(epw_dataframe, Real) .=> minimum, 
-	renamecols=false
-);
-end;
+# begin
+# epw_min_dataframe = combine(
+# 	groupby(epw_dataframe, [:month, :day, :weather_station_id]), 
+# 	names(epw_dataframe, Real) .=> minimum, 
+# 	renamecols=false
+# );
+# end;
 
 # ╔═╡ deac9195-7ffa-4fad-975b-89a05c3997b4
 md"""
@@ -1507,31 +1539,36 @@ custom_datedf = DataFrame(
 # ╔═╡ f4a4c3a9-8ce3-4b08-ab16-484ca96c5037
 epw_dataframe_expanded = dropmissing(select(leftjoin(
 	custom_datedf,
-	epw_median_dataframe,
+	epw_aggregated_dataframe,
 	on=["month", "day"]
-), Not([:month, :day, :hour])), :weather_station_id);
+), Not([:month, :day])), :weather_station_id);
+
+# ╔═╡ f4643504-3e5a-4f4c-b944-c8dbe2f3e7bd
+epw_dataframe_expanded
 
 # ╔═╡ 9e63ec11-033e-40f0-bed8-7a3836a54b93
-epw_dataframe_expanded_M = dropmissing(select(leftjoin(
-	custom_datedf,
-	epw_max_dataframe,
-	on=["month", "day"]
-), Not([:month, :day, :hour])), :weather_station_id);
+# epw_dataframe_expanded_M = dropmissing(select(leftjoin(
+# 	custom_datedf,
+# 	epw_max_dataframe,
+# 	on=["month", "day"]
+# ), Not([:month, :day, :hour])), :weather_station_id);
+
+
 
 # ╔═╡ 5c70f27e-5b69-4281-8cc4-eba8de49b994
-epw_dataframe_expanded_m = dropmissing(select(leftjoin(
-	custom_datedf,
-	epw_min_dataframe,
-	on=["month", "day"]
-), Not([:month, :day, :hour])), :weather_station_id);
+# epw_dataframe_expanded_m = dropmissing(select(leftjoin(
+# 	custom_datedf,
+# 	epw_min_dataframe,
+# 	on=["month", "day"]
+# ), Not([:month, :day, :hour])), :weather_station_id);
+
+
+
+# ╔═╡ 5e7c4c65-463b-4ca0-89db-600533e6b2ed
+epw_dataframe_expanded
 
 # ╔═╡ ad63499e-5735-481f-b559-bf70cd7e7d42
-epw_sampledata = innerjoin(
-	rename(select(epw_dataframe_expanded, [:date, :weather_station_id, Symbol("Drybulb Temperature (°C)")]), "Drybulb Temperature (°C)" => "median_temp"),
-	rename(select(epw_dataframe_expanded_M, [:date, :weather_station_id, Symbol("Drybulb Temperature (°C)")]), "Drybulb Temperature (°C)" => "max_temp"),
-	rename(select(epw_dataframe_expanded_m, [:date, :weather_station_id, Symbol("Drybulb Temperature (°C)")]), "Drybulb Temperature (°C)" => "min_temp"),
-	on=[:date,:weather_station_id]
-)
+epw_sampledata = rename(select(epw_dataframe_expanded, [:date, :weather_station_id, Symbol("Drybulb Temperature (°C)")]), "Drybulb Temperature (°C)" => "median_temp")
 
 # ╔═╡ 76992d99-5910-4a63-be30-0f7005e74f67
 # so this is the goal of what I want to get
@@ -1547,19 +1584,23 @@ nyc_epw_data = select(dropmissing(leftjoin(
 	on="weather_station_id"
 ), ["Property Id"]), ["Property Id","date"], Not("weather_station_id"));
 
+
+
 # ╔═╡ 91e020ec-cd02-44f4-b4f4-9a20f1e6f3cb
-nyc_epw_data_M = select(dropmissing(leftjoin(
-	epw_dataframe_expanded_M,
-	unique_propertymap,
-	on="weather_station_id"
-), ["Property Id"]), ["Property Id","date"], Not("weather_station_id"))
+# nyc_epw_data_M = select(dropmissing(leftjoin(
+# 	epw_dataframe_expanded_M,
+# 	unique_propertymap,
+# 	on="weather_station_id"
+# ), ["Property Id"]), ["Property Id","date"], Not("weather_station_id"))
+
+
 
 # ╔═╡ cec2eae3-d95d-4eda-8220-a0c252a416f6
-nyc_epw_data_m = select(dropmissing(leftjoin(
-	epw_dataframe_expanded_m,
-	unique_propertymap,
-	on="weather_station_id"
-), ["Property Id"]), ["Property Id","date"], Not("weather_station_id"));
+# nyc_epw_data_m = select(dropmissing(leftjoin(
+# 	epw_dataframe_expanded_m,
+# 	unique_propertymap,
+# 	on="weather_station_id"
+# ), ["Property Id"]), ["Property Id","date"], Not("weather_station_id"));
 
 # ╔═╡ d733f31c-b6c6-4a6d-8b80-c0ea2150b8b3
 # nyc_epw_data = select(leftjoin(
@@ -1581,13 +1622,17 @@ CSV.write(
 )
 
 # ╔═╡ 2386de40-02d1-4244-a2f5-9a290ff81858
-CSV.write(
-	joinpath(output_dir, "epw.csv"),
-	nyc_epw_data
-)
+# CSV.write(
+# 	joinpath(output_dir, "epw.csv"),
+# 	nyc_epw_data
+# )
+
+
 
 # ╔═╡ 7b05d439-57bc-415a-a532-949527e63542
-nrow(nyc_epw_data_M) / 1e6
+# nrow(nyc_epw_data_M) / 1e6
+
+
 
 # ╔═╡ 55881340-13e7-4e89-94f9-5c1822970d6c
 CSV.write(
@@ -1595,11 +1640,13 @@ CSV.write(
 	epw_sampledata
 )
 
+
+
 # ╔═╡ 0ef56ae8-c20c-4327-8eac-f6e250515e04
-CSV.write(
-	joinpath(output_dir, "epw_min.csv"),
-	nyc_epw_data_m
-)
+# CSV.write(
+# 	joinpath(output_dir, "epw_min.csv"),
+# 	nyc_epw_data_m
+# )
 
 # ╔═╡ 5379b543-b900-4ffb-a7b9-24107d2c74ef
 # saving the local epw dataframe to build a data map later
@@ -1872,7 +1919,7 @@ building_energy_plot = Gadfly.plot(
 		# Geom.point,
 		Geom.smooth(smoothing=0.2), 
 		free_x_axis = false,
-		Guide.yticks(ticks=collect(0:250:1250)),
+		Guide.yticks(ticks=collect(0:1e5:5e5)),
 		Guide.xticks(ticks=collect(0:7.5e3:2.5e4)),
 	),
 	Guide.title("Energy Use by Type - Distance to Weather Station"),
@@ -2081,6 +2128,7 @@ CSV.write(joinpath(output_dir, "alldata.csv"), nyc_data);
 # ╟─cd5ec182-b189-43ff-81b7-04a92f525678
 # ╟─51381ab9-d91d-4142-ab6c-43140375fd03
 # ╠═0af09aca-8ea7-46c2-a262-795639c295fb
+# ╠═c8fa93b8-df8f-45fb-a512-91ac08b48648
 # ╠═16275ca0-17ab-42e7-b242-a6a804cd8e4c
 # ╠═b6aeff48-f0ce-41fc-8ed7-0552a357bf46
 # ╠═8bd319fc-d76a-4527-b607-944870096343
@@ -2148,7 +2196,11 @@ CSV.write(joinpath(output_dir, "alldata.csv"), nyc_data);
 # ╠═2252a358-a59b-41e6-b1ab-37054987585c
 # ╠═2d70eacf-1793-4fe1-a58e-2f5425cceadc
 # ╠═ba1ab44d-80de-4ea3-9ba2-f4894fef6ade
+# ╠═07c8a2cd-77e6-4fb1-bb79-7959f3e0a514
+# ╠═a82bfb46-86cd-415d-b7e1-234b012cca8e
 # ╠═d993a9a6-107c-40f4-a9f7-2672df4d4e2e
+# ╠═e35e8b71-59ad-4bb7-b5b1-19cf6c24258f
+# ╠═11a9b780-9264-4320-a42a-127a6df9a301
 # ╠═c9c86e93-0d3d-4b64-b5de-62ca93b90ebb
 # ╠═667f9dea-a073-4a36-ab10-773ec5806af6
 # ╟─deac9195-7ffa-4fad-975b-89a05c3997b4
@@ -2158,8 +2210,10 @@ CSV.write(joinpath(output_dir, "alldata.csv"), nyc_data);
 # ╠═cd34c405-7f39-45ca-87af-12c90e611ff0
 # ╠═14ace21b-875b-4ff7-9cde-039a63c5412b
 # ╠═f4a4c3a9-8ce3-4b08-ab16-484ca96c5037
+# ╠═f4643504-3e5a-4f4c-b944-c8dbe2f3e7bd
 # ╠═9e63ec11-033e-40f0-bed8-7a3836a54b93
 # ╠═5c70f27e-5b69-4281-8cc4-eba8de49b994
+# ╠═5e7c4c65-463b-4ca0-89db-600533e6b2ed
 # ╠═ad63499e-5735-481f-b559-bf70cd7e7d42
 # ╠═76992d99-5910-4a63-be30-0f7005e74f67
 # ╠═ca9f2fa1-8611-4a08-809c-2247bb7cdd29
