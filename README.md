@@ -1,6 +1,8 @@
 ## TOM.D: Taking Advantage of Microclimate Data for Urban Building Energy Modeling
 This github repo serves as a digital repository for the resources used in constructing the project: TOM.D. In this work, we explore the potential utility of open access data sources to aid in large scale energy modeling efforts. The process plow is as follows:
 
+![Temperature Nonlinearity](./temperature_nonlinearity.png)
+
 1. P0 - Data Collection
 2. P1 - Data Cleaning
 3. P2 - ([Thermal](https://github.com/trdougherty/thermal)) Collection of Microclimate Data - Google Earth Engine
